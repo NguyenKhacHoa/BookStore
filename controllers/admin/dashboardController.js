@@ -1,0 +1,22 @@
+const orderService = require('../../services/orderService');
+const bookService = require('../../services/bookService');
+
+const dashboardController = {
+  index(req, res, next) {
+    try {
+      const stats = orderService.getDashboardStats();
+      const lowStockBooks = bookService.getLowStockBooks(10, 6);
+
+      return res.render('admin/dashboard', {
+        title: 'Tổng quan quản trị - Bookstore MVC',
+        layout: 'layouts/admin',
+        stats,
+        lowStockBooks,
+      });
+    } catch (err) {
+      return next(err);
+    }
+  },
+};
+
+module.exports = dashboardController;

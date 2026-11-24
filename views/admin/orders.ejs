@@ -1,0 +1,74 @@
+<%
+  const statusStyles = {
+    PENDING: { label: 'Chờ xác nhận', cls: 'bg-amber-100 text-amber-800' },
+    SHIPPING: { label: 'Đang giao', cls: 'bg-sky-100 text-sky-800' },
+    COMPLETED: { label: 'Hoàn thành', cls: 'bg-emerald-100 text-emerald-800' },
+    CANCELLED: { label: 'Đã hủy', cls: 'bg-rose-100 text-rose-800' },
+  };
+  const tabs = [
+    { key: '', label: 'Tất cả' },
+    { key: 'PENDING', label: 'Chờ xác nhận' },
+    { key: 'SHIPPING', label: 'Đang giao' },
+    { key: 'COMPLETED', label: 'Hoàn thành' },
+    { key: 'CANCELLED', label: 'Đã hủy' },
+  ];
+%>
+
+<!-- Filter Tabs -->
+<div class="flex flex-wrap items-center gap-2 mb-6">
+  <% tabs.forEach((tab) => { %>
+    <a
+      href="/admin/orders<%= tab.key ? '?status=' + tab.key : '' %>"
+      class="px-4 py-2 rounded-xl text-xs font-bold border transition <%= (currentStatus || '') === tab.key ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300' %>"
+    >
+      <%= tab.label %>
+    </a>
+  <% }) %>
+</div>
+
+<div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm text-left">
+      <thead class="bg-slate-50 text-xs text-slate-500 uppercase border-b border-slate-200">
+        <tr>
+          <th class="px-5 py-3.5">Mã đơn</th>
+          <th class="px-5 py-3.5">Khách hàng</th>
+          <th class="px-5 py-3.5">Số SP</th>
+          <th class="px-5 py-3.5">Tổng tiền</th>
+          <th class="px-5 py-3.5">Trạng thái</th>
+          <th class="px-5 py-3.5">Ngày đặt</th>
+          <th class="px-5 py-3.5 text-right">Chi tiết</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        <% if (orders.length === 0) { %>
+          <tr>
+            <td colspan="7" class="px-5 py-10 text-center text-slate-500">Không có đơn hàng nào.</td>
+          </tr>
+        <% } %>
+        <% orders.forEach((order) => {
+          const badge = statusStyles[order.status] || { label: order.status, cls: 'bg-slate-100 text-slate-700' };
+        %>
+          <tr class="hover:bg-slate-50">
+            <td class="px-5 py-3.5 font-extrabold text-slate-900">#<%= order.id %></td>
+            <td class="px-5 py-3.5">
+              <div class="font-semibold text-slate-900"><%= order.user_name %></div>
+              <div class="text-xs text-slate-500"><%= order.user_email %></div>
+            </td>
+            <td class="px-5 py-3.5 text-slate-600"><%= order.item_count %> loại</td>
+            <td class="px-5 py-3.5 font-bold text-indigo-600"><%= formatCurrency(order.total_amount) %></td>
+            <td class="px-5 py-3.5">
+              <span class="px-2.5 py-1 rounded-full text-xs font-bold <%= badge.cls %>"><%= badge.label %></span>
+            </td>
+            <td class="px-5 py-3.5 text-xs text-slate-500"><%= order.created_at %></td>
+            <td class="px-5 py-3.5 text-right">
+              <a href="/admin/orders/<%= order.id %>" class="px-3.5 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-semibold hover:bg-indigo-100 transition">
+                Xem &amp; Xử lý &rarr;
+              </a>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>

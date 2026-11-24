@@ -1,0 +1,96 @@
+<%
+  const statusStyles = {
+    PENDING: { label: 'Chờ xác nhận', cls: 'bg-amber-100 text-amber-800' },
+    SHIPPING: { label: 'Đang giao hàng', cls: 'bg-sky-100 text-sky-800' },
+    COMPLETED: { label: 'Hoàn thành', cls: 'bg-emerald-100 text-emerald-800' },
+    CANCELLED: { label: 'Đã hủy', cls: 'bg-rose-100 text-rose-800' },
+  };
+  const badge = statusStyles[order.status] || { label: order.status, cls: 'bg-slate-100 text-slate-700' };
+%>
+
+<div class="mb-5 flex items-center justify-between">
+  <a href="/admin/orders" class="text-sm font-semibold text-indigo-600 hover:underline">&larr; Quay lại danh sách đơn hàng</a>
+  <span class="px-3.5 py-1.5 rounded-full text-xs font-bold <%= badge.cls %>"><%= badge.label %></span>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+  <!-- Order Items -->
+  <div class="lg:col-span-8 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+      <h2 class="font-bold text-slate-900">Chi tiết đơn hàng #<%= order.id %></h2>
+      <span class="text-xs text-slate-500">Ngày đặt: <%= order.created_at %></span>
+    </div>
+
+    <div class="divide-y divide-slate-100">
+      <% (order.items || []).forEach((item) => { %>
+        <div class="px-6 py-4 flex items-center gap-4">
+          <img
+            src="<%= item.book_cover || '/images/default-book.png' %>"
+            alt="<%= item.book_title %>"
+            class="w-12 h-16 rounded-lg object-cover border border-slate-200 shrink-0"
+          />
+          <div class="flex-1 min-w-0">
+            <div class="font-bold text-slate-900 text-sm"><%= item.book_title %></div>
+            <div class="text-xs text-slate-500"><%= item.book_author %></div>
+            <div class="text-xs text-slate-600 mt-1">
+              <%= formatCurrency(item.unit_price) %> &times; <%= item.quantity %>
+            </div>
+          </div>
+          <div class="font-extrabold text-slate-900 text-sm">
+            <%= formatCurrency(item.unit_price * item.quantity) %>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+
+    <div class="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+      <span class="font-bold text-slate-700">Tổng thanh toán (<%= order.payment_method %>)</span>
+      <span class="text-xl font-extrabold text-indigo-600"><%= formatCurrency(order.total_amount) %></span>
+    </div>
+  </div>
+
+  <!-- Info & Status Update -->
+  <div class="lg:col-span-4 space-y-6">
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-3 text-sm">
+      <h3 class="font-bold text-slate-900 pb-2 border-b border-slate-200">Thông tin khách hàng</h3>
+      <div><span class="text-slate-500">Họ tên:</span> <strong class="text-slate-800"><%= order.user_name %></strong></div>
+      <div><span class="text-slate-500">Email:</span> <span class="text-slate-800"><%= order.user_email %></span></div>
+      <div><span class="text-slate-500">SĐT nhận:</span> <strong class="text-slate-800"><%= order.phone %></strong></div>
+      <div><span class="text-slate-500">Địa chỉ:</span> <span class="text-slate-800"><%= order.shipping_address %></span></div>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+      <h3 class="font-bold text-slate-900 pb-3 border-b border-slate-200 mb-4">Cập nhật trạng thái</h3>
+
+      <% if (order.status === 'COMPLETED' || order.status === 'CANCELLED') { %>
+        <p class="text-sm text-slate-500">
+          Đơn hàng đã ở trạng thái cuối (<strong><%= badge.label %></strong>) và không thể thay đổi thêm.
+        </p>
+      <% } else { %>
+        <form action="/admin/orders/<%= order.id %>/status" method="POST" class="space-y-4">
+          <div>
+            <label for="status" class="block text-xs font-semibold text-slate-600 uppercase mb-1.5">Chọn trạng thái mới</label>
+            <select
+              id="status"
+              name="status"
+              class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl bg-white outline-none focus:border-indigo-500"
+            >
+              <% if (order.status === 'PENDING') { %>
+                <option value="SHIPPING">Đang giao hàng (SHIPPING)</option>
+                <option value="COMPLETED">Hoàn thành (COMPLETED)</option>
+                <option value="CANCELLED">Hủy đơn &amp; Hoàn kho (CANCELLED)</option>
+              <% } else if (order.status === 'SHIPPING') { %>
+                <option value="COMPLETED">Hoàn thành (COMPLETED)</option>
+                <option value="CANCELLED">Hủy đơn &amp; Hoàn kho (CANCELLED)</option>
+              <% } %>
+            </select>
+          </div>
+
+          <button type="submit" class="w-full py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 shadow-sm transition">
+            Cập nhật trạng thái
+          </button>
+        </form>
+      <% } %>
+    </div>
+  </div>
+</div>

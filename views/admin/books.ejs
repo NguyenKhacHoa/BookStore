@@ -1,0 +1,105 @@
+<div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+  <form action="/admin/books" method="GET" class="flex flex-wrap items-center gap-2.5">
+    <input
+      type="text"
+      name="q"
+      value="<%= filters.q || '' %>"
+      placeholder="Tìm tên sách, tác giả..."
+      class="px-3.5 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:border-indigo-500 outline-none w-56"
+    />
+    <select name="category" onchange="this.form.submit()" class="px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl outline-none">
+      <option value="">Tất cả danh mục</option>
+      <% categories.forEach((cat) => { %>
+        <option value="<%= cat.id %>" <%= String(filters.category) === String(cat.id) ? 'selected' : '' %>>
+          <%= cat.name %>
+        </option>
+      <% }) %>
+    </select>
+    <select name="sort" onchange="this.form.submit()" class="px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl outline-none">
+      <option value="newest" <%= filters.sort === 'newest' ? 'selected' : '' %>>Mới nhất</option>
+      <option value="stock_asc" <%= filters.sort === 'stock_asc' ? 'selected' : '' %>>Tồn kho thấp nhất</option>
+      <option value="price_asc" <%= filters.sort === 'price_asc' ? 'selected' : '' %>>Giá tăng dần</option>
+      <option value="price_desc" <%= filters.sort === 'price_desc' ? 'selected' : '' %>>Giá giảm dần</option>
+    </select>
+    <button type="submit" class="px-4 py-2 rounded-xl bg-slate-800 text-white text-sm font-semibold hover:bg-slate-900 transition">
+      Lọc
+    </button>
+  </form>
+
+  <a href="/admin/books/create" class="px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 shadow-sm transition">
+    + Thêm sách mới
+  </a>
+</div>
+
+<div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm text-left">
+      <thead class="bg-slate-50 text-xs text-slate-500 uppercase border-b border-slate-200">
+        <tr>
+          <th class="px-5 py-3.5">Sách</th>
+          <th class="px-5 py-3.5">Danh mục</th>
+          <th class="px-5 py-3.5">Giá bán</th>
+          <th class="px-5 py-3.5">Tồn kho</th>
+          <th class="px-5 py-3.5">Trạng thái</th>
+          <th class="px-5 py-3.5 text-right">Thao tác</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        <% if (books.length === 0) { %>
+          <tr>
+            <td colspan="6" class="px-5 py-10 text-center text-slate-500">Không có cuốn sách nào.</td>
+          </tr>
+        <% } %>
+        <% books.forEach((book) => { %>
+          <tr class="hover:bg-slate-50">
+            <td class="px-5 py-3.5">
+              <div class="flex items-center gap-3">
+                <img src="<%= book.cover_image %>" alt="<%= book.title %>" class="w-11 h-14 rounded-lg object-cover border border-slate-200 shrink-0" />
+                <div>
+                  <div class="font-bold text-slate-900"><%= book.title %></div>
+                  <div class="text-xs text-slate-500"><%= book.author %></div>
+                </div>
+              </div>
+            </td>
+            <td class="px-5 py-3.5 text-slate-600"><%= book.category_name %></td>
+            <td class="px-5 py-3.5 font-bold text-indigo-600"><%= formatCurrency(book.price) %></td>
+            <td class="px-5 py-3.5">
+              <span class="px-2.5 py-1 rounded-full text-xs font-bold <%= book.stock <= 5 ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-700' %>">
+                <%= book.stock %>
+              </span>
+            </td>
+            <td class="px-5 py-3.5">
+              <% if (book.is_active) { %>
+                <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">Đang bán</span>
+              <% } else { %>
+                <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-slate-200 text-slate-600">Đang ẩn</span>
+              <% } %>
+            </td>
+            <td class="px-5 py-3.5 text-right">
+              <div class="inline-flex items-center gap-2">
+                <a href="/admin/books/<%= book.id %>/edit" class="px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-semibold hover:bg-indigo-100 transition">
+                  Sửa
+                </a>
+                <form action="/admin/books/<%= book.id %>/toggle" method="POST" class="inline">
+                  <button type="submit" class="px-3 py-1.5 rounded-lg bg-amber-50 text-amber-700 text-xs font-semibold hover:bg-amber-100 transition">
+                    <%= book.is_active ? 'Ẩn' : 'Hiện' %>
+                  </button>
+                </form>
+                <form
+                  action="/admin/books/<%= book.id %>/delete"
+                  method="POST"
+                  class="inline"
+                  onsubmit="return confirm('Xóa sách \"<%= book.title %>\"? (Nếu sách đã có trong đơn hàng, hệ thống sẽ tự chuyển sang ẩn)')"
+                >
+                  <button type="submit" class="px-3 py-1.5 rounded-lg bg-rose-50 text-rose-700 text-xs font-semibold hover:bg-rose-100 transition">
+                    Xóa
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>

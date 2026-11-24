@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title><%= typeof title !== 'undefined' ? title : 'Admin - Bookstore MVC' %></title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen antialiased">
+  <div class="min-h-screen flex flex-col lg:flex-row">
+    <%- include('../partials/sidebar') %>
+
+    <div class="flex-1 flex flex-col min-w-0">
+      <header class="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between sticky top-0 z-20">
+        <div>
+          <h1 class="text-lg font-bold text-slate-900">
+            <%= typeof title !== 'undefined' ? title.replace(' - Admin', '').replace(' - Bookstore MVC', '') : 'Quản trị hệ thống' %>
+          </h1>
+          <p class="text-xs text-slate-500">Hệ thống quản trị Bookstore MVC</p>
+        </div>
+        <div class="flex items-center gap-4">
+          <a href="/" class="text-sm font-medium text-indigo-600 hover:text-indigo-700 transition">
+            Xem cửa hàng &rarr;
+          </a>
+          <div class="hidden sm:flex items-center gap-2 pl-4 border-l border-slate-200">
+            <div class="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-bold">
+              <%= currentUser ? currentUser.full_name.charAt(0).toUpperCase() : 'A' %>
+            </div>
+            <div class="text-xs">
+              <div class="font-semibold text-slate-800"><%= currentUser ? currentUser.full_name : 'Admin' %></div>
+              <div class="text-slate-500"><%= currentUser ? currentUser.email : '' %></div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main class="flex-1 p-6 max-w-7xl w-full mx-auto">
+        <%- include('../partials/flash-message') %>
+        <%- body %>
+      </main>
+    </div>
+  </div>
+</body>
+</html>
