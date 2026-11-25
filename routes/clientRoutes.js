@@ -40,6 +40,8 @@ router.get('/orders/:id/payment', requireLogin, orderController.showPaymentQr);
 router.get('/orders/:id/payment-status', requireLogin, orderController.getPaymentStatus);
 router.get('/orders/:id/status', requireLogin, orderController.getOrderStatus);
 router.get('/orders/:id', requireLogin, orderController.orderDetail);
+router.post('/orders/:id/confirm-received', requireLogin, orderController.confirmReceived);
+router.post('/orders/:id/request-return', requireLogin, orderController.requestReturn);
 router.post('/orders/:id/cancel', requireLogin, orderController.cancelOrder);
 
 // Webhook xác nhận thanh toán VietQR (Demo / Bank callback)

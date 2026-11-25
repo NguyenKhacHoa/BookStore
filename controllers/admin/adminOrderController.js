@@ -61,6 +61,40 @@ const adminOrderController = {
     const backUrl = req.get('Referer') || `/admin/orders/${req.params.id}`;
     return res.redirect(backUrl);
   },
+
+  async approveReturn(req, res) {
+    try {
+      await orderService.approveReturn({ orderId: req.params.id });
+      req.session.flash = {
+        type: 'success',
+        message: `Đã chấp nhận hoàn hàng cho đơn #${req.params.id}, hoàn tiền (REFUNDED) và cộng lại tồn kho.`,
+      };
+    } catch (err) {
+      req.session.flash = {
+        type: 'error',
+        message: err.message,
+      };
+    }
+    const backUrl = req.get('Referer') || `/admin/orders/${req.params.id}`;
+    return res.redirect(backUrl);
+  },
+
+  async rejectReturn(req, res) {
+    try {
+      await orderService.rejectReturn({ orderId: req.params.id });
+      req.session.flash = {
+        type: 'success',
+        message: `Đã từ chối yêu cầu hoàn hàng cho đơn #${req.params.id}.`,
+      };
+    } catch (err) {
+      req.session.flash = {
+        type: 'error',
+        message: err.message,
+      };
+    }
+    const backUrl = req.get('Referer') || `/admin/orders/${req.params.id}`;
+    return res.redirect(backUrl);
+  },
 };
 
 module.exports = adminOrderController;

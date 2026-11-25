@@ -4,7 +4,16 @@ const orderRepository = require('../repositories/orderRepository');
 const PaymentContext = require('./payment/PaymentContext');
 const VietQrStrategy = require('./payment/VietQrStrategy');
 
-const VALID_STATUSES = ['PENDING', 'CONFIRMED', 'SHIPPING', 'COMPLETED', 'CANCELLED'];
+const VALID_STATUSES = [
+  'PENDING',
+  'CONFIRMED',
+  'SHIPPING',
+  'COMPLETED',
+  'CANCELLED',
+  'RETURN_REQUESTED',
+  'RETURNED',
+  'RETURN_REJECTED',
+];
 
 const orderService = {
   /**
@@ -170,9 +179,124 @@ const orderService = {
   },
 
   /**
-   * Hủy đơn hàng & hoàn lại tồn kho trong PostgreSQL Transaction:
-   * - Khách hàng: chỉ được hủy khi status === 'PENDING' và phải là chủ đơn.
-   * - Admin: được hủy khi status là 'PENDING', 'CONFIRMED' hoặc 'SHIPPING'.
+   * Khách hàng xác nhận đã nhận được hàng khi đơn đang SHIPPING:
+   * - Kiểm tra đúng chủ sở hữu đơn hàng (user_id) và status === 'SHIPPING'.
+   * - Chuyển status -> 'COMPLETED'.
+   * - Nếu payment_method === 'COD' -> cập nhật luôn payment_status = 'PAID'.
+   */
+  async confirmOrderReceived({ orderId, actorUser }) {
+    const completedId = await withTransaction(async (client) => {
+      const order = await orderRepository.findById(Number(orderId), client);
+      if (!order) {
+        throw new Error('Không tìm thấy đơn hàng.');
+      }
+
+      if (!actorUser || Number(order.user_id) !== Number(actorUser.id)) {
+        throw new Error('Bạn không có quyền xác nhận đơn hàng này.');
+      }
+
+      if (order.status !== 'SHIPPING') {
+        throw new Error('Chỉ có thể xác nhận đã nhận hàng khi đơn đang ở trạng thái Đang giao hàng (SHIPPING).');
+      }
+
+      await orderRepository.updateStatus(order.id, 'COMPLETED', client);
+
+      if (order.payment_method === 'COD') {
+        await query("UPDATE orders SET payment_status = 'PAID' WHERE id = $1", [order.id], client);
+      }
+
+      return order.id;
+    });
+
+    return this.getOrderDetail(completedId);
+  },
+
+  /**
+   * Khách hàng gửi yêu cầu hoàn hàng (chỉ khi đơn đang COMPLETED).
+   */
+  async requestReturn({ orderId, actorUser, reason }) {
+    const cleanReason = (reason || '').trim();
+    if (!cleanReason) {
+      throw new Error('Vui lòng nhập lý do yêu cầu hoàn hàng.');
+    }
+
+    const order = await orderRepository.findById(Number(orderId));
+    if (!order) {
+      throw new Error('Không tìm thấy đơn hàng.');
+    }
+
+    if (!actorUser || Number(order.user_id) !== Number(actorUser.id)) {
+      throw new Error('Bạn không có quyền gửi yêu cầu hoàn hàng cho đơn này.');
+    }
+
+    if (order.status !== 'COMPLETED') {
+      throw new Error('Chỉ có thể yêu cầu hoàn hàng khi đơn hàng đã hoàn thành (COMPLETED).');
+    }
+
+    await query(
+      "UPDATE orders SET status = 'RETURN_REQUESTED', return_reason = $1 WHERE id = $2",
+      [cleanReason, order.id]
+    );
+
+    return this.getOrderDetail(order.id);
+  },
+
+  /**
+   * Admin chấp nhận hoàn hàng (Transaction):
+   * - Đổi status -> 'RETURNED'
+   * - Đổi payment_status -> 'REFUNDED'
+   * - Cộng hoàn lại stock vào bảng books
+   */
+  async approveReturn({ orderId }) {
+    const returnedId = await withTransaction(async (client) => {
+      const order = await orderRepository.findById(Number(orderId), client);
+      if (!order) {
+        throw new Error('Không tìm thấy đơn hàng.');
+      }
+
+      if (order.status !== 'RETURN_REQUESTED') {
+        throw new Error('Chỉ có thể chấp nhận hoàn hàng cho đơn đang ở trạng thái Yêu cầu hoàn hàng.');
+      }
+
+      await query(
+        "UPDATE orders SET status = 'RETURNED', payment_status = 'REFUNDED' WHERE id = $1",
+        [order.id],
+        client
+      );
+
+      const items = await orderRepository.findItemsByOrderId(order.id, client);
+      for (const item of items) {
+        await bookRepository.incrementStock(item.book_id, item.quantity, client);
+      }
+
+      return order.id;
+    });
+
+    return this.getOrderDetail(returnedId);
+  },
+
+  /**
+   * Admin từ chối hoàn hàng -> chuyển status sang 'RETURN_REJECTED'.
+   */
+  async rejectReturn({ orderId }) {
+    const order = await orderRepository.findById(Number(orderId));
+    if (!order) {
+      throw new Error('Không tìm thấy đơn hàng.');
+    }
+
+    if (order.status !== 'RETURN_REQUESTED') {
+      throw new Error('Chỉ có thể từ chối hoàn hàng cho đơn đang ở trạng thái Yêu cầu hoàn hàng.');
+    }
+
+    await orderRepository.updateStatus(order.id, 'RETURN_REJECTED');
+    return this.getOrderDetail(order.id);
+  },
+
+  /**
+   * Hủy đơn hàng, hoàn tồn kho & hoàn tiền (nếu đã thanh toán) trong PostgreSQL Transaction:
+   * - Chỉ cho phép hủy khi order.status === 'PENDING' (áp dụng cho cả Khách hàng & Admin).
+   * - Nếu status là CONFIRMED / SHIPPING / COMPLETED -> báo lỗi "Đơn hàng đã được xác nhận, không thể hủy".
+   * - Nếu payment_status === 'PAID' -> tự động cập nhật payment_status = 'REFUNDED'.
    */
   async cancelOrder({ orderId, actorUser }) {
     const cancelledId = await withTransaction(async (client) => {
@@ -186,17 +310,19 @@ const orderService = {
         throw new Error('Bạn không có quyền hủy đơn hàng này.');
       }
 
-      if (isAdmin) {
-        if (!['PENDING', 'CONFIRMED', 'SHIPPING'].includes(order.status)) {
-          throw new Error(`Không thể hủy đơn hàng đang ở trạng thái ${order.status}.`);
-        }
-      } else if (order.status !== 'PENDING') {
-        throw new Error(
-          'Khách hàng chỉ có thể hủy đơn hàng khi đang ở trạng thái Chờ xác nhận (PENDING).'
-        );
+      if (order.status === 'CANCELLED') {
+        throw new Error('Đơn hàng này đã được hủy trước đó.');
+      }
+
+      if (order.status !== 'PENDING') {
+        throw new Error('Đơn hàng đã được xác nhận, không thể hủy');
       }
 
       await orderRepository.updateStatus(order.id, 'CANCELLED', client);
+
+      if (order.payment_status === 'PAID') {
+        await query("UPDATE orders SET payment_status = 'REFUNDED' WHERE id = $1", [order.id], client);
+      }
 
       const items = await orderRepository.findItemsByOrderId(order.id, client);
       for (const item of items) {
@@ -296,18 +422,28 @@ const orderService = {
   },
 
   async getDashboardStats() {
-    const [stats, soldRes] = await Promise.all([
+    const [stats, revenueRes, soldRes] = await Promise.all([
       orderRepository.getDashboardStats(),
+      query(`
+        SELECT COALESCE(SUM(total_amount), 0)::int AS revenue
+        FROM orders
+        WHERE status IN ('COMPLETED', 'RETURN_REJECTED')
+      `),
       query(`
         SELECT COALESCE(SUM(oi.quantity), 0)::int AS total_sold
         FROM order_items oi
         JOIN orders o ON o.id = oi.order_id
-        WHERE o.status != 'CANCELLED'
+        WHERE o.status NOT IN ('CANCELLED', 'RETURNED')
       `),
     ]);
-    if (stats.statusCounts.CONFIRMED === undefined) {
-      stats.statusCounts.CONFIRMED = 0;
+
+    for (const key of ['CONFIRMED', 'RETURN_REQUESTED', 'RETURNED', 'RETURN_REJECTED']) {
+      if (stats.statusCounts[key] === undefined) {
+        stats.statusCounts[key] = 0;
+      }
     }
+
+    stats.totalRevenue = revenueRes.rows[0] ? revenueRes.rows[0].revenue : 0;
     stats.totalBooksSold = soldRes.rows[0] ? soldRes.rows[0].total_sold : 0;
     return stats;
   },

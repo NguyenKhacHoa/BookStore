@@ -33,5 +33,7 @@ router.post('/categories/:id/delete', adminCategoryController.remove);
 router.get('/orders', adminOrderController.list);
 router.get('/orders/:id', adminOrderController.detail);
 router.post('/orders/:id/status', adminOrderController.updateStatus);
+router.post('/orders/:id/approve-return', adminOrderController.approveReturn);
+router.post('/orders/:id/reject-return', adminOrderController.rejectReturn);
 
 module.exports = router;

@@ -49,9 +49,10 @@ File SQL khởi tạo bảng & dữ liệu mẫu nằm tại: [`supabase/schema_
 | `shipping_address` | TEXT | NOT NULL | Địa chỉ nhận hàng |
 | `phone` | TEXT | NOT NULL | SĐT người nhận |
 | `payment_method` | TEXT | NOT NULL DEFAULT `'COD'` | Phương thức thanh toán (`COD`, `VIETQR`) |
-| `payment_status` | TEXT | NOT NULL DEFAULT `'UNPAID'` CHECK (`'UNPAID'`, `'PAID'`) | Trạng thái thanh toán |
+| `payment_status` | TEXT | NOT NULL DEFAULT `'UNPAID'` CHECK (`'UNPAID'`, `'PAID'`, `'REFUNDED'`) | Trạng thái thanh toán / hoàn tiền |
 | `transaction_code` | TEXT | UNIQUE | Mã giao dịch VietQR (`DH<orderId><random>`) |
-| `status` | TEXT | NOT NULL DEFAULT `'PENDING'` | `PENDING`, `CONFIRMED`, `SHIPPING`, `COMPLETED`, `CANCELLED` |
+| `return_reason` | TEXT | NULL | Lý do khách hàng yêu cầu hoàn hàng |
+| `status` | TEXT | NOT NULL DEFAULT `'PENDING'` | `PENDING`, `CONFIRMED`, `SHIPPING`, `COMPLETED`, `CANCELLED`, `RETURN_REQUESTED`, `RETURNED`, `RETURN_REJECTED` |
 | `created_at` | TIMESTAMPTZ | NOT NULL DEFAULT `NOW()` | Thời điểm đặt hàng |
 
 ### 1.5. Bảng `order_items` (Chi tiết từng sách trong đơn)

@@ -21,14 +21,36 @@ Khi khách bấm **"Xác nhận đặt hàng"** (`POST /checkout`):
 - Nút **"Giả lập ngân hàng báo đã nhận tiền (Demo)"** gọi `POST /api/payment/webhook` cập nhật `payment_status = 'PAID'` và chuyển thẳng sang trang theo dõi đơn hàng `/orders/:id`.
 
 ## 3. Theo dõi Đơn hàng 4 bước & Đồng bộ với Admin
-- Vòng đời đơn hàng gồm 4 bước chính: `PENDING` (Chờ xác nhận) → `CONFIRMED` (Đã xác nhận) → `SHIPPING` (Đang giao hàng) → `COMPLETED` (Hoàn thành), hoặc `CANCELLED` (Đã hủy).
-- Khách hàng truy cập **Đơn hàng của tôi** (`/orders`) và chi tiết theo dõi (`/orders/:id`) để xem Stepper 4 bước, badge trạng thái thanh toán (`Đã thanh toán` / `Chưa thanh toán`), nút **Quét QR thanh toán ngay** (nếu `VIETQR` + `UNPAID`) và nút **Hủy đơn hàng** (nếu `PENDING`).
+- Vòng đời đơn hàng gồm 4 bước chính: `PENDING` (Chờ xác nhận) → `CONFIRMED` (Đã xác nhận) → `SHIPPING` (Đang giao hàng) → `COMPLETED` (Hoàn thành — khi User bấm **"Đã nhận được hàng"** hoặc Admin hoàn tất), hoặc `CANCELLED` (Đã hủy).
+- Khách hàng truy cập **Đơn hàng của tôi** (`/orders`) và chi tiết theo dõi (`/orders/:id`) để xem Stepper 4 bước, badge trạng thái thanh toán (`Đã thanh toán` / `Chưa thanh toán`), nút **Quét QR thanh toán ngay** (nếu `VIETQR` + `UNPAID`), nút **Hủy đơn hàng** (nếu `PENDING`) và nút **"Đã nhận được hàng"** (`POST /orders/:id/confirm-received` khi `status === 'SHIPPING'`).
+- Khi khách hàng bấm **"Đã nhận được hàng"**, hệ thống kiểm tra quyền sở hữu `user_id` và trạng thái `SHIPPING`, cập nhật `status = 'COMPLETED'` (nếu `payment_method === 'COD'` thì đồng thời cập nhật `payment_status = 'PAID'`), thanh tiến trình nhảy sang bước cuối và đồng bộ ngay với trang quản lý Admin.
 - Trang `/orders/:id` tự động polling `GET /orders/:id/status` mỗi **5 giây** để đồng bộ ngay lập tức khi Admin duyệt hoặc chuyển trạng thái đơn.
 
-## 4. Quy trình Hủy đơn & Hoàn tồn kho
-- **Phía Khách hàng:** Chỉ được phép hủy đơn khi `status === 'PENDING'`.
-- **Phía Admin:** Có thể hủy đơn khi `status` là `'PENDING'`, `'CONFIRMED'` hoặc `'SHIPPING'`.
-- **Nghiệp vụ hoàn kho:** Khi đơn chuyển sang `'CANCELLED'`, `orderService.cancelOrder()` chạy Transaction để cộng trả lại `quantity` vào cột `stock` của từng cuốn sách trong `order_items`.
+## 4. Quy trình Hủy đơn, Hoàn tiền (`REFUNDED`) & Hoàn tồn kho
+- **Điều kiện khóa hủy đơn:** Chỉ cho phép hủy đơn hàng khi `order.status === 'PENDING'` (áp dụng cho cả Khách hàng và Admin). Sau khi Admin đã duyệt sang `CONFIRMED`, `SHIPPING` hoặc `COMPLETED`, giao diện ẩn hoàn toàn nút Hủy đơn và tầng Service (`orderService.cancelOrder()`) sẽ ném lỗi *"Đơn hàng đã được xác nhận, không thể hủy"*.
+- **Nghiệp vụ hoàn tiền & hoàn kho (Transaction):**
+  - Cập nhật `orders.status = 'CANCELLED'`.
+  - Nếu `order.payment_status === 'PAID'` (ví dụ đơn VietQR đã thanh toán), hệ thống tự động cập nhật `payment_status = 'REFUNDED'` (hiển thị Badge **Đã hoàn tiền (VIETQR)**). Nếu là `'UNPAID'` thì giữ nguyên `'UNPAID'`.
+  - Cộng trả lại toàn bộ `quantity` vào cột `stock` của từng cuốn sách trong `order_items`.
+
+## 4.1. Luồng Hoàn hàng / Trả hàng (Return & Refund)
+- **Phía Khách hàng:** Khi đơn hàng ở trạng thái `COMPLETED`, nút **"Yêu cầu hoàn hàng"** hiển thị tại `/orders` và `/orders/:id`. Khách nhập lý do hoàn hàng (`return_reason`) và gửi `POST /orders/:id/request-return` → `status` chuyển thành `RETURN_REQUESTED`.
+- **Phía Admin:** Tại `/admin/orders` và `/admin/orders/:id`, các đơn `RETURN_REQUESTED` được làm nổi bật kèm lý do hoàn hàng và 2 nút xử lý:
+  - **"Chấp nhận hoàn hàng"** (`POST /admin/orders/:id/approve-return`): chạy Transaction chuyển `status = 'RETURNED'`, `payment_status = 'REFUNDED'` và cộng hoàn lại `stock` vào bảng `books`.
+  - **"Từ chối hoàn hàng"** (`POST /admin/orders/:id/reject-return`): chuyển `status = 'RETURN_REJECTED'`.
+- **Thống kê doanh thu Dashboard:** Chỉ cộng doanh thu từ các đơn `COMPLETED` và `RETURN_REJECTED` (loại trừ hoàn toàn `RETURNED` và `CANCELLED`).
+
+```mermaid
+stateDiagram-v2
+    [*] --> PENDING: Khách đặt hàng (trừ tồn kho)
+    PENDING --> CANCELLED: Hủy đơn (hoàn kho + REFUNDED nếu PAID)
+    PENDING --> CONFIRMED: Admin duyệt đơn (khóa hủy)
+    CONFIRMED --> SHIPPING: Admin giao hàng
+    SHIPPING --> COMPLETED: User bấm 'Đã nhận được hàng' / Admin hoàn tất
+    COMPLETED --> RETURN_REQUESTED: User gửi yêu cầu hoàn hàng + lý do
+    RETURN_REQUESTED --> RETURNED: Admin chấp nhận (REFUNDED + hoàn kho)
+    RETURN_REQUESTED --> RETURN_REJECTED: Admin từ chối (vẫn tính doanh thu)
+```
 
 ## 5. Phân quyền, Tách bạch Giao diện & Bảo vệ Route Admin
 - Mọi route bắt đầu bằng `/admin` đều phải đi qua 2 lớp bảo vệ: `requireLogin` → `requireAdmin` (`req.session.user.role === 'admin'`).

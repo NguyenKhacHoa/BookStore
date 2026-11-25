@@ -188,6 +188,47 @@ const orderController = {
     }
   },
 
+  async confirmReceived(req, res) {
+    try {
+      await orderService.confirmOrderReceived({
+        orderId: req.params.id,
+        actorUser: req.session.user,
+      });
+      req.session.flash = {
+        type: 'success',
+        message: `Đã xác nhận nhận hàng thành công cho đơn hàng #${req.params.id}! Cảm ơn bạn đã mua sắm.`,
+      };
+    } catch (err) {
+      req.session.flash = {
+        type: 'error',
+        message: err.message,
+      };
+    }
+    const backUrl = req.get('Referer') || `/orders/${req.params.id}`;
+    return res.redirect(backUrl);
+  },
+
+  async requestReturn(req, res) {
+    try {
+      await orderService.requestReturn({
+        orderId: req.params.id,
+        actorUser: req.session.user,
+        reason: req.body.return_reason,
+      });
+      req.session.flash = {
+        type: 'success',
+        message: `Đã gửi yêu cầu hoàn hàng cho đơn hàng #${req.params.id}. Vui lòng chờ quản trị viên xét duyệt.`,
+      };
+    } catch (err) {
+      req.session.flash = {
+        type: 'error',
+        message: err.message,
+      };
+    }
+    const backUrl = req.get('Referer') || `/orders/${req.params.id}`;
+    return res.redirect(backUrl);
+  },
+
   async cancelOrder(req, res) {
     try {
       await orderService.cancelOrder({
