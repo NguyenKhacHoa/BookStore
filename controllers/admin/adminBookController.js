@@ -1,21 +1,23 @@
 const bookService = require('../../services/bookService');
 
 const adminBookController = {
-  list(req, res, next) {
+  async list(req, res, next) {
     try {
       const { q = '', category = '', sort = 'newest', page = 1 } = req.query;
-      const categories = bookService.getAllCategories();
-
       const isNumericCategory = /^\d+$/.test(String(category).trim());
-      const { books, pagination } = bookService.getBooks({
-        search: q,
-        categoryId: isNumericCategory ? Number(category) : null,
-        categorySlug: isNumericCategory ? '' : category,
-        sort,
-        page,
-        limit: 20,
-        includeInactive: true,
-      });
+
+      const [categories, { books, pagination }] = await Promise.all([
+        bookService.getAllCategories(),
+        bookService.getBooks({
+          search: q,
+          categoryId: isNumericCategory ? Number(category) : null,
+          categorySlug: isNumericCategory ? '' : category,
+          sort,
+          page,
+          limit: 20,
+          includeInactive: true,
+        }),
+      ]);
 
       return res.render('admin/books', {
         title: 'Quản lý sách - Admin',
@@ -30,9 +32,9 @@ const adminBookController = {
     }
   },
 
-  showCreateForm(req, res, next) {
+  async showCreateForm(req, res, next) {
     try {
-      const categories = bookService.getAllCategories();
+      const categories = await bookService.getAllCategories();
       return res.render('admin/book-form', {
         title: 'Thêm sách mới - Admin',
         layout: 'layouts/admin',
@@ -45,13 +47,13 @@ const adminBookController = {
     }
   },
 
-  create(req, res) {
+  async create(req, res) {
     try {
       const cover_image = req.file
         ? `/uploads/${req.file.filename}`
         : (req.body.cover_image || '').trim() || '/images/default-book.png';
 
-      bookService.createBook({
+      await bookService.createBook({
         category_id: req.body.category_id,
         title: req.body.title,
         author: req.body.author,
@@ -76,9 +78,13 @@ const adminBookController = {
     }
   },
 
-  showEditForm(req, res, next) {
+  async showEditForm(req, res, next) {
     try {
-      const book = bookService.getBookById(req.params.id);
+      const [book, categories] = await Promise.all([
+        bookService.getBookById(req.params.id),
+        bookService.getAllCategories(),
+      ]);
+
       if (!book) {
         req.session.flash = {
           type: 'error',
@@ -87,7 +93,6 @@ const adminBookController = {
         return res.redirect('/admin/books');
       }
 
-      const categories = bookService.getAllCategories();
       return res.render('admin/book-form', {
         title: `Chỉnh sửa: ${book.title} - Admin`,
         layout: 'layouts/admin',
@@ -100,9 +105,9 @@ const adminBookController = {
     }
   },
 
-  update(req, res) {
+  async update(req, res) {
     try {
-      const existing = bookService.getBookById(req.params.id);
+      const existing = await bookService.getBookById(req.params.id);
       if (!existing) {
         throw new Error('Không tìm thấy cuốn sách cần cập nhật.');
       }
@@ -111,7 +116,7 @@ const adminBookController = {
         ? `/uploads/${req.file.filename}`
         : (req.body.cover_image || '').trim() || existing.cover_image;
 
-      bookService.updateBook(req.params.id, {
+      await bookService.updateBook(req.params.id, {
         category_id: req.body.category_id,
         title: req.body.title,
         author: req.body.author,
@@ -119,7 +124,8 @@ const adminBookController = {
         stock: req.body.stock,
         cover_image,
         description: req.body.description,
-        is_active: req.body.is_active !== undefined ? Number(req.body.is_active) : existing.is_active,
+        is_active:
+          req.body.is_active !== undefined ? Number(req.body.is_active) : existing.is_active,
       });
 
       req.session.flash = {
@@ -136,9 +142,9 @@ const adminBookController = {
     }
   },
 
-  remove(req, res) {
+  async remove(req, res) {
     try {
-      const result = bookService.deleteOrHideBook(req.params.id);
+      const result = await bookService.deleteOrHideBook(req.params.id);
       req.session.flash = {
         type: 'success',
         message: result.message,
@@ -152,9 +158,9 @@ const adminBookController = {
     return res.redirect('/admin/books');
   },
 
-  toggleStatus(req, res) {
+  async toggleStatus(req, res) {
     try {
-      const nextState = bookService.toggleBookActive(req.params.id);
+      const nextState = await bookService.toggleBookActive(req.params.id);
       req.session.flash = {
         type: 'success',
         message: nextState ? 'Đã mở bán lại cuốn sách.' : 'Đã ẩn cuốn sách khỏi trang bán hàng.',

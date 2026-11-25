@@ -24,17 +24,16 @@ const cartController = {
     }
   },
 
-  addToCart(req, res) {
+  async addToCart(req, res) {
     try {
       const bookId = Number(req.body.bookId);
       const addQty = Math.max(1, parseInt(req.body.quantity, 10) || 1);
 
       const cart = ensureCart(req);
-      const existingItem = cart.find((item) => item.bookId === bookId);
+      const existingItem = cart.find((item) => Number(item.bookId) === bookId);
       const newQuantity = existingItem ? existingItem.quantity + addQty : addQty;
 
-      // Kiểm tra tồn kho qua bookService
-      const book = bookService.validateBookStock(bookId, newQuantity);
+      const book = await bookService.validateBookStock(bookId, newQuantity);
 
       if (existingItem) {
         existingItem.quantity = newQuantity;
@@ -43,7 +42,7 @@ const cartController = {
         existingItem.cover_image = book.cover_image;
       } else {
         cart.push({
-          bookId: book.id,
+          bookId: Number(book.id),
           title: book.title,
           price: book.price,
           cover_image: book.cover_image,
@@ -66,12 +65,12 @@ const cartController = {
     return res.redirect(backUrl);
   },
 
-  updateCart(req, res) {
+  async updateCart(req, res) {
     try {
       const bookId = Number(req.body.bookId);
       const quantity = parseInt(req.body.quantity, 10);
       const cart = ensureCart(req);
-      const idx = cart.findIndex((item) => item.bookId === bookId);
+      const idx = cart.findIndex((item) => Number(item.bookId) === bookId);
 
       if (idx === -1) {
         req.session.flash = {
@@ -90,7 +89,7 @@ const cartController = {
         return res.redirect('/cart');
       }
 
-      const book = bookService.validateBookStock(bookId, quantity);
+      const book = await bookService.validateBookStock(bookId, quantity);
       cart[idx].quantity = quantity;
       cart[idx].price = book.price;
       cart[idx].title = book.title;
@@ -113,7 +112,7 @@ const cartController = {
   removeFromCart(req, res) {
     const bookId = Number(req.body.bookId);
     const cart = ensureCart(req);
-    req.session.cart = cart.filter((item) => item.bookId !== bookId);
+    req.session.cart = cart.filter((item) => Number(item.bookId) !== bookId);
 
     req.session.flash = {
       type: 'success',

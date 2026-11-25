@@ -9,10 +9,10 @@ const authController = {
     });
   },
 
-  login(req, res) {
+  async login(req, res) {
     try {
       const { email, password } = req.body;
-      const user = authService.login({ email, password });
+      const user = await authService.login({ email, password });
 
       req.session.user = user;
       req.session.flash = {
@@ -44,7 +44,7 @@ const authController = {
     });
   },
 
-  register(req, res) {
+  async register(req, res) {
     try {
       const { email, password, confirm_password, full_name, phone, address } = req.body;
 
@@ -52,7 +52,7 @@ const authController = {
         throw new Error('Mật khẩu xác nhận không khớp.');
       }
 
-      const user = authService.register({ email, password, full_name, phone, address });
+      const user = await authService.register({ email, password, full_name, phone, address });
       req.session.user = {
         id: user.id,
         email: user.email,

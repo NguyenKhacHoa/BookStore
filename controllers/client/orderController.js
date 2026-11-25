@@ -22,12 +22,12 @@ const orderController = {
     });
   },
 
-  placeOrder(req, res) {
+  async placeOrder(req, res) {
     try {
       const cart = Array.isArray(req.session.cart) ? req.session.cart : [];
       const { shipping_address, phone, payment_method } = req.body;
 
-      const order = orderService.createOrder({
+      const order = await orderService.createOrder({
         userId: req.session.user.id,
         cart,
         shippingAddress: shipping_address,
@@ -35,7 +35,6 @@ const orderController = {
         paymentMethod: payment_method || 'COD',
       });
 
-      // Xóa giỏ hàng sau khi commit transaction thành công
       req.session.cart = [];
       req.session.flash = {
         type: 'success',
@@ -51,9 +50,9 @@ const orderController = {
     }
   },
 
-  listOrders(req, res, next) {
+  async listOrders(req, res, next) {
     try {
-      const orders = orderService.getUserOrders(req.session.user.id);
+      const orders = await orderService.getUserOrders(req.session.user.id);
       return res.render('client/orders', {
         title: 'Lịch sử đơn hàng - Bookstore MVC',
         layout: 'layouts/main',
@@ -64,9 +63,9 @@ const orderController = {
     }
   },
 
-  cancelOrder(req, res) {
+  async cancelOrder(req, res) {
     try {
-      orderService.cancelOrder({
+      await orderService.cancelOrder({
         orderId: req.params.id,
         actorUser: req.session.user,
       });

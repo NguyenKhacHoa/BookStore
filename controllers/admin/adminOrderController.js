@@ -1,10 +1,10 @@
 const orderService = require('../../services/orderService');
 
 const adminOrderController = {
-  list(req, res, next) {
+  async list(req, res, next) {
     try {
       const { status = '' } = req.query;
-      const orders = orderService.getAdminOrders({ status });
+      const orders = await orderService.getAdminOrders({ status });
 
       return res.render('admin/orders', {
         title: 'Quản lý đơn hàng - Admin',
@@ -17,9 +17,9 @@ const adminOrderController = {
     }
   },
 
-  detail(req, res, next) {
+  async detail(req, res, next) {
     try {
-      const order = orderService.getOrderDetail(req.params.id, req.session.user);
+      const order = await orderService.getOrderDetail(req.params.id, req.session.user);
       if (!order) {
         req.session.flash = {
           type: 'error',
@@ -38,10 +38,10 @@ const adminOrderController = {
     }
   },
 
-  updateStatus(req, res) {
+  async updateStatus(req, res) {
     try {
       const { status } = req.body;
-      orderService.updateOrderStatus({
+      await orderService.updateOrderStatus({
         orderId: req.params.id,
         newStatus: status,
         adminUser: req.session.user,

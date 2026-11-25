@@ -1,9 +1,9 @@
 const bookService = require('../../services/bookService');
 
 const adminCategoryController = {
-  list(req, res, next) {
+  async list(req, res, next) {
     try {
-      const categories = bookService.getCategoriesWithBookCount();
+      const categories = await bookService.getCategoriesWithBookCount();
       return res.render('admin/categories', {
         title: 'Quản lý danh mục - Admin',
         layout: 'layouts/admin',
@@ -14,9 +14,9 @@ const adminCategoryController = {
     }
   },
 
-  create(req, res) {
+  async create(req, res) {
     try {
-      bookService.createCategory({
+      await bookService.createCategory({
         name: req.body.name,
         slug: req.body.slug,
       });
@@ -33,9 +33,9 @@ const adminCategoryController = {
     return res.redirect('/admin/categories');
   },
 
-  update(req, res) {
+  async update(req, res) {
     try {
-      bookService.updateCategory(req.params.id, {
+      await bookService.updateCategory(req.params.id, {
         name: req.body.name,
         slug: req.body.slug,
       });
@@ -52,9 +52,9 @@ const adminCategoryController = {
     return res.redirect('/admin/categories');
   },
 
-  remove(req, res) {
+  async remove(req, res) {
     try {
-      bookService.deleteCategory(req.params.id);
+      await bookService.deleteCategory(req.params.id);
       req.session.flash = {
         type: 'success',
         message: 'Xóa danh mục thành công!',

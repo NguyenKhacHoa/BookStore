@@ -1,7 +1,7 @@
 {
   "name": "bookstore-mvc",
   "version": "1.0.0",
-  "description": "Bookstore MVC - He Thong Quan Ly & Ban Sach Truc Tuyen",
+  "description": "Bookstore MVC - He Thong Quan Ly & Ban Sach Truc Tuyen (Supabase PostgreSQL)",
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
@@ -9,12 +9,13 @@
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
-    "better-sqlite3": "^13.2.0",
+    "dotenv": "^16.4.5",
     "ejs": "^3.1.10",
     "express": "^4.19.2",
     "express-ejs-layouts": "^2.5.1",
     "express-session": "^1.18.0",
-    "multer": "^2.5.0"
+    "multer": "^2.5.0",
+    "pg": "^8.13.1"
   },
   "devDependencies": {
     "nodemon": "^3.1.4"

@@ -1,7 +1,7 @@
-const db = require('../config/database');
+const { query } = require('../config/database');
 
 const bookRepository = {
-  findAll({
+  async findAll({
     search = '',
     categoryId = null,
     categorySlug = '',
@@ -18,19 +18,20 @@ const bookRepository = {
     }
 
     if (search && search.trim()) {
-      conditions.push('(b.title LIKE ? OR b.author LIKE ?)');
       const keyword = `%${search.trim()}%`;
-      params.push(keyword, keyword);
+      params.push(keyword);
+      const idx = params.length;
+      conditions.push(`(b.title ILIKE $${idx} OR b.author ILIKE $${idx})`);
     }
 
     if (categoryId) {
-      conditions.push('b.category_id = ?');
       params.push(Number(categoryId));
+      conditions.push(`b.category_id = $${params.length}`);
     }
 
     if (categorySlug && categorySlug.trim()) {
-      conditions.push('c.slug = ?');
       params.push(categorySlug.trim());
+      conditions.push(`c.slug = $${params.length}`);
     }
 
     const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -62,14 +63,18 @@ const bookRepository = {
     `;
 
     if (limit !== null && limit !== undefined) {
-      sql += ' LIMIT ? OFFSET ?';
-      params.push(Number(limit), Number(offset));
+      params.push(Number(limit));
+      const limitIdx = params.length;
+      params.push(Number(offset));
+      const offsetIdx = params.length;
+      sql += ` LIMIT $${limitIdx} OFFSET $${offsetIdx}`;
     }
 
-    return db.prepare(sql).all(...params);
+    const { rows } = await query(sql, params);
+    return rows;
   },
 
-  countAll({ search = '', categoryId = null, categorySlug = '', includeInactive = false } = {}) {
+  async countAll({ search = '', categoryId = null, categorySlug = '', includeInactive = false } = {}) {
     const conditions = [];
     const params = [];
 
@@ -78,83 +83,95 @@ const bookRepository = {
     }
 
     if (search && search.trim()) {
-      conditions.push('(b.title LIKE ? OR b.author LIKE ?)');
       const keyword = `%${search.trim()}%`;
-      params.push(keyword, keyword);
+      params.push(keyword);
+      const idx = params.length;
+      conditions.push(`(b.title ILIKE $${idx} OR b.author ILIKE $${idx})`);
     }
 
     if (categoryId) {
-      conditions.push('b.category_id = ?');
       params.push(Number(categoryId));
+      conditions.push(`b.category_id = $${params.length}`);
     }
 
     if (categorySlug && categorySlug.trim()) {
-      conditions.push('c.slug = ?');
       params.push(categorySlug.trim());
+      conditions.push(`c.slug = $${params.length}`);
     }
 
     const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     const sql = `
-      SELECT COUNT(*) AS count
+      SELECT COUNT(*)::int AS count
       FROM books b
       LEFT JOIN categories c ON b.category_id = c.id
       ${whereClause}
     `;
 
-    return db.prepare(sql).get(...params).count;
+    const { rows } = await query(sql, params);
+    return rows[0].count;
   },
 
-  findById(id) {
-    return db
-      .prepare(`
-        SELECT b.*, c.name AS category_name, c.slug AS category_slug
-        FROM books b
-        LEFT JOIN categories c ON b.category_id = c.id
-        WHERE b.id = ?
-      `)
-      .get(id);
+  async findById(id, client = null) {
+    const { rows } = await query(
+      `SELECT b.*, c.name AS category_name, c.slug AS category_slug
+       FROM books b
+       LEFT JOIN categories c ON b.category_id = c.id
+       WHERE b.id = $1`,
+      [id],
+      client
+    );
+    return rows[0] || null;
   },
 
-  findFeatured(limit = 8) {
-    return db
-      .prepare(`
-        SELECT b.*, c.name AS category_name, c.slug AS category_slug
-        FROM books b
-        LEFT JOIN categories c ON b.category_id = c.id
-        WHERE b.is_active = 1
-        ORDER BY b.id DESC
-        LIMIT ?
-      `)
-      .all(limit);
+  async findByIdForUpdate(id, client) {
+    const { rows } = await query(
+      'SELECT * FROM books WHERE id = $1 FOR UPDATE',
+      [id],
+      client
+    );
+    return rows[0] || null;
   },
 
-  findRelated(categoryId, excludeBookId, limit = 4) {
-    return db
-      .prepare(`
-        SELECT b.*, c.name AS category_name, c.slug AS category_slug
-        FROM books b
-        LEFT JOIN categories c ON b.category_id = c.id
-        WHERE b.is_active = 1 AND b.category_id = ? AND b.id != ?
-        ORDER BY b.id DESC
-        LIMIT ?
-      `)
-      .all(categoryId, excludeBookId, limit);
+  async findFeatured(limit = 8) {
+    const { rows } = await query(
+      `SELECT b.*, c.name AS category_name, c.slug AS category_slug
+       FROM books b
+       LEFT JOIN categories c ON b.category_id = c.id
+       WHERE b.is_active = 1
+       ORDER BY b.id DESC
+       LIMIT $1`,
+      [limit]
+    );
+    return rows;
   },
 
-  findLowStock(threshold = 10, limit = 5) {
-    return db
-      .prepare(`
-        SELECT b.*, c.name AS category_name
-        FROM books b
-        LEFT JOIN categories c ON b.category_id = c.id
-        WHERE b.is_active = 1 AND b.stock <= ?
-        ORDER BY b.stock ASC, b.id ASC
-        LIMIT ?
-      `)
-      .all(threshold, limit);
+  async findRelated(categoryId, excludeBookId, limit = 4) {
+    const { rows } = await query(
+      `SELECT b.*, c.name AS category_name, c.slug AS category_slug
+       FROM books b
+       LEFT JOIN categories c ON b.category_id = c.id
+       WHERE b.is_active = 1 AND b.category_id = $1 AND b.id != $2
+       ORDER BY b.id DESC
+       LIMIT $3`,
+      [categoryId, excludeBookId, limit]
+    );
+    return rows;
   },
 
-  create({
+  async findLowStock(threshold = 10, limit = 5) {
+    const { rows } = await query(
+      `SELECT b.*, c.name AS category_name
+       FROM books b
+       LEFT JOIN categories c ON b.category_id = c.id
+       WHERE b.is_active = 1 AND b.stock <= $1
+       ORDER BY b.stock ASC, b.id ASC
+       LIMIT $2`,
+      [threshold, limit]
+    );
+    return rows;
+  },
+
+  async create({
     category_id,
     title,
     author,
@@ -164,65 +181,64 @@ const bookRepository = {
     description = '',
     is_active = 1,
   }) {
-    const stmt = db.prepare(`
-      INSERT INTO books (category_id, title, author, price, stock, cover_image, description, is_active)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    const result = stmt.run(
-      category_id,
-      title,
-      author,
-      price,
-      stock,
-      cover_image,
-      description,
-      is_active
+    const { rows } = await query(
+      `INSERT INTO books (category_id, title, author, price, stock, cover_image, description, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id`,
+      [category_id, title, author, price, stock, cover_image, description, is_active]
     );
-    return this.findById(result.lastInsertRowid);
+    return this.findById(rows[0].id);
   },
 
-  update(id, { category_id, title, author, price, stock, cover_image, description, is_active }) {
-    const stmt = db.prepare(`
-      UPDATE books
-      SET category_id = ?,
-          title = ?,
-          author = ?,
-          price = ?,
-          stock = ?,
-          cover_image = ?,
-          description = ?,
-          is_active = ?
-      WHERE id = ?
-    `);
-    stmt.run(category_id, title, author, price, stock, cover_image, description, is_active, id);
+  async update(id, { category_id, title, author, price, stock, cover_image, description, is_active }) {
+    await query(
+      `UPDATE books
+       SET category_id = $1,
+           title = $2,
+           author = $3,
+           price = $4,
+           stock = $5,
+           cover_image = $6,
+           description = $7,
+           is_active = $8
+       WHERE id = $9`,
+      [category_id, title, author, price, stock, cover_image, description, is_active, id]
+    );
     return this.findById(id);
   },
 
-  setActive(id, isActive) {
-    return db.prepare('UPDATE books SET is_active = ? WHERE id = ?').run(isActive ? 1 : 0, id);
+  async setActive(id, isActive) {
+    return query('UPDATE books SET is_active = $1 WHERE id = $2', [isActive ? 1 : 0, id]);
   },
 
-  deleteHard(id) {
-    return db.prepare('DELETE FROM books WHERE id = ?').run(id);
+  async deleteHard(id) {
+    return query('DELETE FROM books WHERE id = $1', [id]);
   },
 
-  hasOrderItems(bookId) {
-    const row = db
-      .prepare('SELECT COUNT(*) AS count FROM order_items WHERE book_id = ?')
-      .get(bookId);
-    return row.count > 0;
+  async hasOrderItems(bookId) {
+    const { rows } = await query(
+      'SELECT COUNT(*)::int AS count FROM order_items WHERE book_id = $1',
+      [bookId]
+    );
+    return rows[0].count > 0;
   },
 
-  decrementStock(bookId, quantity) {
-    return db
-      .prepare('UPDATE books SET stock = stock - ? WHERE id = ? AND stock >= ?')
-      .run(quantity, bookId, quantity);
+  async decrementStock(bookId, quantity, client = null) {
+    const result = await query(
+      'UPDATE books SET stock = stock - $1 WHERE id = $2 AND stock >= $1',
+      [quantity, bookId],
+      client
+    );
+    return { changes: result.rowCount };
   },
 
-  incrementStock(bookId, quantity) {
-    return db
-      .prepare('UPDATE books SET stock = stock + ? WHERE id = ?')
-      .run(quantity, bookId);
+  async incrementStock(bookId, quantity, client = null) {
+    const result = await query(
+      'UPDATE books SET stock = stock + $1 WHERE id = $2',
+      [quantity, bookId],
+      client
+    );
+    return { changes: result.rowCount };
   },
 };
 

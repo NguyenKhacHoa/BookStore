@@ -1,9 +1,9 @@
 const bookService = require('../../services/bookService');
 
 const homeController = {
-  index(req, res, next) {
+  async index(req, res, next) {
     try {
-      const { featuredBooks, categories } = bookService.getHomeData();
+      const { featuredBooks, categories } = await bookService.getHomeData();
       return res.render('client/home', {
         title: 'Trang chủ - Bookstore MVC',
         layout: 'layouts/main',

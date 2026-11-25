@@ -1,37 +1,41 @@
-const db = require('../config/database');
+const { query } = require('../config/database');
 
 const userRepository = {
-  findByEmail(email) {
-    return db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+  async findByEmail(email) {
+    const { rows } = await query('SELECT * FROM users WHERE email = $1', [email]);
+    return rows[0] || null;
   },
 
-  findById(id) {
-    return db
-      .prepare(
-        'SELECT id, email, full_name, phone, address, role, is_active, created_at FROM users WHERE id = ?'
-      )
-      .get(id);
+  async findById(id) {
+    const { rows } = await query(
+      'SELECT id, email, full_name, phone, address, role, is_active, created_at FROM users WHERE id = $1',
+      [id]
+    );
+    return rows[0] || null;
   },
 
-  create({ email, password_hash, full_name, phone = null, address = null, role = 'user' }) {
-    const stmt = db.prepare(`
-      INSERT INTO users (email, password_hash, full_name, phone, address, role, is_active)
-      VALUES (?, ?, ?, ?, ?, ?, 1)
-    `);
-    const result = stmt.run(email, password_hash, full_name, phone, address, role);
-    return this.findById(result.lastInsertRowid);
+  async create({ email, password_hash, full_name, phone = null, address = null, role = 'user' }) {
+    const { rows } = await query(
+      `INSERT INTO users (email, password_hash, full_name, phone, address, role, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6, 1)
+       RETURNING id, email, full_name, phone, address, role, is_active, created_at`,
+      [email, password_hash, full_name, phone, address, role]
+    );
+    return rows[0];
   },
 
-  findAll() {
-    return db
-      .prepare(
-        'SELECT id, email, full_name, phone, address, role, is_active, created_at FROM users ORDER BY created_at DESC'
-      )
-      .all();
+  async findAll() {
+    const { rows } = await query(
+      'SELECT id, email, full_name, phone, address, role, is_active, created_at FROM users ORDER BY created_at DESC'
+    );
+    return rows;
   },
 
-  countAll() {
-    return db.prepare("SELECT COUNT(*) AS count FROM users WHERE role = 'user'").get().count;
+  async countAll() {
+    const { rows } = await query(
+      "SELECT COUNT(*)::int AS count FROM users WHERE role = 'user'"
+    );
+    return rows[0].count;
   },
 };
 

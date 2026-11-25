@@ -1,9 +1,10 @@
+require('dotenv').config();
 const path = require('path');
 const express = require('express');
 const expressLayouts = require('express-ejs-layouts');
 const session = require('express-session');
 
-// Tự động kết nối SQLite, khởi tạo 5 bảng & nạp seed data
+// Khởi tạo kết nối pool PostgreSQL (Supabase)
 require('./config/database');
 
 const { attachLocals } = require('./middlewares/authMiddleware');
@@ -73,7 +74,7 @@ app.use((err, req, res, next) => {
 
 if (require.main === module) {
   app.listen(PORT, () => {
-    console.log(`Bookstore MVC đang chạy tại http://localhost:${PORT}`);
+    console.log(`Bookstore MVC (Supabase) đang chạy tại http://localhost:${PORT}`);
   });
 }
 

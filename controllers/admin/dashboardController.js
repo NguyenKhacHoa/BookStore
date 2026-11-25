@@ -2,10 +2,12 @@ const orderService = require('../../services/orderService');
 const bookService = require('../../services/bookService');
 
 const dashboardController = {
-  index(req, res, next) {
+  async index(req, res, next) {
     try {
-      const stats = orderService.getDashboardStats();
-      const lowStockBooks = bookService.getLowStockBooks(10, 6);
+      const [stats, lowStockBooks] = await Promise.all([
+        orderService.getDashboardStats(),
+        bookService.getLowStockBooks(10, 6),
+      ]);
 
       return res.render('admin/dashboard', {
         title: 'Tổng quan quản trị - Bookstore MVC',

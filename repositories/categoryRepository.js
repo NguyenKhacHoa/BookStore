@@ -1,52 +1,63 @@
-const db = require('../config/database');
+const { query } = require('../config/database');
 
 const categoryRepository = {
-  findAll() {
-    return db.prepare('SELECT * FROM categories ORDER BY id ASC').all();
+  async findAll() {
+    const { rows } = await query('SELECT * FROM categories ORDER BY id ASC');
+    return rows;
   },
 
-  findAllWithBookCount() {
-    return db
-      .prepare(`
-        SELECT c.id, c.name, c.slug, COUNT(b.id) AS book_count
-        FROM categories c
-        LEFT JOIN books b ON b.category_id = c.id AND b.is_active = 1
-        GROUP BY c.id
-        ORDER BY c.id ASC
-      `)
-      .all();
+  async findAllWithBookCount() {
+    const { rows } = await query(`
+      SELECT c.id, c.name, c.slug, COUNT(b.id)::int AS book_count
+      FROM categories c
+      LEFT JOIN books b ON b.category_id = c.id AND b.is_active = 1
+      GROUP BY c.id
+      ORDER BY c.id ASC
+    `);
+    return rows;
   },
 
-  findById(id) {
-    return db.prepare('SELECT * FROM categories WHERE id = ?').get(id);
+  async findById(id) {
+    const { rows } = await query('SELECT * FROM categories WHERE id = $1', [id]);
+    return rows[0] || null;
   },
 
-  findBySlug(slug) {
-    return db.prepare('SELECT * FROM categories WHERE slug = ?').get(slug);
+  async findBySlug(slug) {
+    const { rows } = await query('SELECT * FROM categories WHERE slug = $1', [slug]);
+    return rows[0] || null;
   },
 
-  findByName(name) {
-    return db.prepare('SELECT * FROM categories WHERE LOWER(name) = LOWER(?)').get(name);
+  async findByName(name) {
+    const { rows } = await query('SELECT * FROM categories WHERE LOWER(name) = LOWER($1)', [name]);
+    return rows[0] || null;
   },
 
-  create({ name, slug }) {
-    const result = db
-      .prepare('INSERT INTO categories (name, slug) VALUES (?, ?)')
-      .run(name, slug);
-    return this.findById(result.lastInsertRowid);
+  async create({ name, slug }) {
+    const { rows } = await query(
+      'INSERT INTO categories (name, slug) VALUES ($1, $2) RETURNING *',
+      [name, slug]
+    );
+    return rows[0];
   },
 
-  update(id, { name, slug }) {
-    db.prepare('UPDATE categories SET name = ?, slug = ? WHERE id = ?').run(name, slug, id);
-    return this.findById(id);
+  async update(id, { name, slug }) {
+    const { rows } = await query(
+      'UPDATE categories SET name = $1, slug = $2 WHERE id = $3 RETURNING *',
+      [name, slug, id]
+    );
+    return rows[0] || null;
   },
 
-  delete(id) {
-    return db.prepare('DELETE FROM categories WHERE id = ?').run(id);
+  async delete(id) {
+    return query('DELETE FROM categories WHERE id = $1', [id]);
   },
 
-  countBooksInCategory(id) {
-    return db.prepare('SELECT COUNT(*) AS count FROM books WHERE category_id = ?').get(id).count;
+  async countBooksInCategory(id) {
+    const { rows } = await query(
+      'SELECT COUNT(*)::int AS count FROM books WHERE category_id = $1',
+      [id]
+    );
+    return rows[0].count;
   },
 };
 

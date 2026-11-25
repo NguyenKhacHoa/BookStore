@@ -1,22 +1,23 @@
 const bookService = require('../../services/bookService');
 
 const bookController = {
-  list(req, res, next) {
+  async list(req, res, next) {
     try {
       const { q = '', category = '', sort = 'newest', page = 1 } = req.query;
-      const categories = bookService.getCategoriesWithBookCount();
-
-      // Hỗ trợ lọc theo slug hoặc id của danh mục
       const isNumericCategory = /^\d+$/.test(String(category).trim());
-      const { books, pagination } = bookService.getBooks({
-        search: q,
-        categoryId: isNumericCategory ? Number(category) : null,
-        categorySlug: isNumericCategory ? '' : category,
-        sort,
-        page,
-        limit: 12,
-        includeInactive: false,
-      });
+
+      const [categories, { books, pagination }] = await Promise.all([
+        bookService.getCategoriesWithBookCount(),
+        bookService.getBooks({
+          search: q,
+          categoryId: isNumericCategory ? Number(category) : null,
+          categorySlug: isNumericCategory ? '' : category,
+          sort,
+          page,
+          limit: 12,
+          includeInactive: false,
+        }),
+      ]);
 
       return res.render('client/books', {
         title: 'Danh mục sách - Bookstore MVC',
@@ -31,9 +32,9 @@ const bookController = {
     }
   },
 
-  detail(req, res, next) {
+  async detail(req, res, next) {
     try {
-      const result = bookService.getBookDetail(req.params.id);
+      const result = await bookService.getBookDetail(req.params.id);
       if (!result) {
         req.session.flash = {
           type: 'error',
