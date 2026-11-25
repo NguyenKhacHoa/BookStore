@@ -13,11 +13,15 @@ router.get('/', homeController.index);
 router.get('/books', bookController.list);
 router.get('/books/:id', bookController.detail);
 
-// Xác thực (Đăng nhập, Đăng ký, Đăng xuất)
+// Xác thực (Đăng nhập, Đăng ký, Quên mật khẩu OTP, Đăng xuất)
 router.get('/login', redirectIfAuthenticated, authController.showLogin);
 router.post('/login', redirectIfAuthenticated, authController.login);
 router.get('/register', redirectIfAuthenticated, authController.showRegister);
 router.post('/register', redirectIfAuthenticated, authController.register);
+router.get('/forgot-password', redirectIfAuthenticated, authController.showForgotPassword);
+router.post('/forgot-password', redirectIfAuthenticated, authController.sendResetOtp);
+router.get('/reset-password', redirectIfAuthenticated, authController.showResetPassword);
+router.post('/reset-password', redirectIfAuthenticated, authController.resetPassword);
 router.post('/logout', requireLogin, authController.logout);
 
 // Giỏ hàng (Session Cart)
@@ -27,10 +31,18 @@ router.post('/cart/update', cartController.updateCart);
 router.post('/cart/remove', cartController.removeFromCart);
 router.post('/cart/clear', cartController.clearCart);
 
-// Thanh toán & Lịch sử đơn hàng (Yêu cầu đăng nhập)
+// Thanh toán & Theo dõi đơn hàng (Yêu cầu đăng nhập)
 router.get('/checkout', requireLogin, orderController.showCheckout);
 router.post('/checkout', requireLogin, orderController.placeOrder);
+
 router.get('/orders', requireLogin, orderController.listOrders);
+router.get('/orders/:id/payment', requireLogin, orderController.showPaymentQr);
+router.get('/orders/:id/payment-status', requireLogin, orderController.getPaymentStatus);
+router.get('/orders/:id/status', requireLogin, orderController.getOrderStatus);
+router.get('/orders/:id', requireLogin, orderController.orderDetail);
 router.post('/orders/:id/cancel', requireLogin, orderController.cancelOrder);
+
+// Webhook xác nhận thanh toán VietQR (Demo / Bank callback)
+router.post('/api/payment/webhook', orderController.paymentWebhook);
 
 module.exports = router;

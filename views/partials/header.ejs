@@ -31,7 +31,7 @@
       </form>
 
       <!-- Nav & Actions -->
-      <div class="flex items-center gap-2 sm:gap-4">
+      <div class="flex items-center gap-2 sm:gap-3">
         <nav class="hidden sm:flex items-center gap-1">
           <a href="/" class="px-3 py-2 rounded-lg text-sm font-medium <%= currentPath === '/' ? 'text-indigo-600 bg-indigo-50' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100' %> transition">
             Trang chủ
@@ -41,34 +41,43 @@
           </a>
         </nav>
 
-        <!-- Cart -->
-        <a href="/cart" class="relative p-2 rounded-xl text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 transition" title="Giỏ hàng">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-          </svg>
-          <% if (cartCount > 0) { %>
-            <span class="absolute -top-0.5 -right-0.5 min-w-[20px] h-5 px-1 rounded-full bg-indigo-600 text-white text-[11px] font-bold flex items-center justify-center shadow">
-              <%= cartCount %>
-            </span>
-          <% } %>
-        </a>
+        <!-- Cart (Ẩn hoàn toàn khi tài khoản là Admin) -->
+        <% if (!currentUser || currentUser.role !== 'admin') { %>
+          <a href="/cart" class="relative p-2 rounded-xl text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 transition" title="Giỏ hàng">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+            <% if (cartCount > 0) { %>
+              <span class="absolute -top-0.5 -right-0.5 min-w-[20px] h-5 px-1 rounded-full bg-indigo-600 text-white text-[11px] font-bold flex items-center justify-center shadow">
+                <%= cartCount %>
+              </span>
+            <% } %>
+          </a>
+        <% } %>
 
         <!-- User Menu -->
         <% if (currentUser) { %>
           <div class="flex items-center gap-2 pl-2 border-l border-slate-200">
-            <a href="/orders" class="hidden lg:inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition">
-              Đơn hàng
-            </a>
-            <% if (currentUser.role === 'admin') { %>
-              <a href="/admin" class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-amber-800 bg-amber-100 hover:bg-amber-200 transition">
-                Admin
+            <% if (currentUser.role !== 'admin') { %>
+              <a
+                href="/orders"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition <%= currentPath.startsWith('/orders') ? 'bg-indigo-600 text-white shadow-sm' : 'text-indigo-700 bg-indigo-50 hover:bg-indigo-100' %>"
+              >
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+                <span>Đơn hàng của tôi</span>
+              </a>
+            <% } else { %>
+              <a href="/admin" class="inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-bold text-amber-800 bg-amber-100 hover:bg-amber-200 transition">
+                Trang quản trị
               </a>
             <% } %>
-            <span class="hidden md:inline text-sm font-semibold text-slate-700 max-w-[120px] truncate">
+            <span class="hidden lg:inline text-sm font-semibold text-slate-700 max-w-[120px] truncate">
               <%= currentUser.full_name %>
             </span>
             <form action="/logout" method="POST" class="inline">
-              <button type="submit" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 transition">
+              <button type="submit" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 transition">
                 Đăng xuất
               </button>
             </form>

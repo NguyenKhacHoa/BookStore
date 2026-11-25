@@ -1,11 +1,13 @@
 # Bookstore MVC - Hệ Thống Quản Lý & Bán Sách Trực Tuyến
 
-Dự án xây dựng website bán sách cơ bản phục vụ môn học **Software Architecture & Design**, áp dụng kiến trúc phân tầng **MVC kết hợp Repository & Service Pattern** trên nền **Supabase (PostgreSQL)**.
+Dự án xây dựng website bán sách cơ bản phục vụ môn học **Software Architecture & Design**, áp dụng kiến trúc phân tầng **MVC kết hợp Repository, Service & Strategy Pattern** trên nền **Supabase (PostgreSQL)**.
 
-## 1. Công nghệ sử dụng
+## 1. Công nghệ & Design Patterns
 - **Runtime & Framework:** Node.js, Express.js
 - **View Engine:** EJS + Tailwind CSS
 - **Database:** Supabase (PostgreSQL) kết nối qua `pg` Pool + ACID Transactions (`FOR UPDATE`)
+- **Thanh toán:** Strategy Pattern (`PaymentContext`, `CodStrategy`, `VietQrStrategy`) hỗ trợ **COD** và **VietQR** động + webhook demo + auto-polling trạng thái
+- **Theo dõi đơn hàng:** Stepper 4 bước (`PENDING` → `CONFIRMED` → `SHIPPING` → `COMPLETED` / `CANCELLED`) tự động đồng bộ với Admin
 - **Xác thực & Upload:** `express-session`, `bcryptjs`, `multer`, `dotenv`
 
 ## 2. Hướng dẫn cài đặt và chạy dự án với Supabase
@@ -14,14 +16,10 @@ Dự án xây dựng website bán sách cơ bản phục vụ môn học **Softw
    npm install
    ```
 2. Khởi tạo bảng & dữ liệu mẫu trên **Supabase**:
-   - Mở **Supabase Dashboard** → **SQL Editor** → **New query**.
-   - Dán toàn bộ nội dung file [`supabase/schema_and_seed.sql`](./supabase/schema_and_seed.sql) và bấm **Run**.
+   - Nếu tạo mới từ đầu: chạy [`supabase/schema_and_seed.sql`](./supabase/schema_and_seed.sql) trong **Supabase Dashboard → SQL Editor**.
+   - Nếu đã tạo bảng trước đó: chạy thêm [`supabase/migration_vietqr_tracking.sql`](./supabase/migration_vietqr_tracking.sql) để thêm `payment_status`, `transaction_code` và trạng thái `CONFIRMED`.
 3. Cấu hình biến môi trường:
-   - Sao chép `.env.example` thành `.env`:
-     ```bash
-     cp .env.example .env
-     ```
-   - Lấy chuỗi kết nối tại **Supabase Dashboard** → **Connect** → **Session Pooler** (hoặc Direct Connection) và điền vào `DATABASE_URL` trong `.env`.
+   - Sao chép `.env.example` thành `.env` và điền `DATABASE_URL` lấy từ **Supabase Dashboard → Connect → Session Pooler**.
 4. Khởi chạy server:
    ```bash
    npm start

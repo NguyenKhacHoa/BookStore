@@ -1,16 +1,18 @@
-const { withTransaction } = require('../config/database');
+const { query, withTransaction } = require('../config/database');
 const bookRepository = require('../repositories/bookRepository');
 const orderRepository = require('../repositories/orderRepository');
+const PaymentContext = require('./payment/PaymentContext');
+const VietQrStrategy = require('./payment/VietQrStrategy');
 
-const VALID_STATUSES = ['PENDING', 'SHIPPING', 'COMPLETED', 'CANCELLED'];
+const VALID_STATUSES = ['PENDING', 'CONFIRMED', 'SHIPPING', 'COMPLETED', 'CANCELLED'];
 
 const orderService = {
   /**
    * Tạo đơn hàng trong một PostgreSQL Transaction (Supabase):
    * 1. Khóa dòng sách (FOR UPDATE) & kiểm tra tồn kho thực tế.
    * 2. Tạo bản ghi orders (PENDING).
-   * 3. Lưu order_items với unit_price hiện tại từ DB.
-   * 4. Trừ stock trong bảng books.
+   * 3. Áp dụng Payment Strategy (COD hoặc VIETQR) để sinh mã giao dịch nếu là VietQR.
+   * 4. Lưu order_items với unit_price hiện tại từ DB & trừ stock.
    */
   async createOrder({ userId, cart, shippingAddress, phone, paymentMethod = 'COD' }) {
     if (!Array.isArray(cart) || cart.length === 0) {
@@ -23,7 +25,10 @@ const orderService = {
       throw new Error('Vui lòng nhập đầy đủ địa chỉ giao hàng và số điện thoại.');
     }
 
-    const newOrderId = await withTransaction(async (client) => {
+    const normalizedMethod =
+      String(paymentMethod || 'COD').trim().toUpperCase() === 'VIETQR' ? 'VIETQR' : 'COD';
+
+    const { orderId, paymentResult } = await withTransaction(async (client) => {
       let totalAmount = 0;
       const verifiedItems = [];
 
@@ -52,22 +57,36 @@ const orderService = {
         });
       }
 
-      const orderId = await orderRepository.createOrder(
+      const createdOrderId = await orderRepository.createOrder(
         {
           user_id: Number(userId),
           total_amount: totalAmount,
           shipping_address: cleanAddress,
           phone: cleanPhone,
-          payment_method: paymentMethod || 'COD',
+          payment_method: normalizedMethod,
           status: 'PENDING',
         },
+        client
+      );
+
+      // Thực thi Strategy Pattern (CodStrategy / VietQrStrategy)
+      const paymentContext = PaymentContext.fromMethod(normalizedMethod);
+      const strategyResult = paymentContext.execute({
+        id: createdOrderId,
+        total_amount: totalAmount,
+      });
+
+      // Lưu payment_status & transaction_code (nếu VietQR)
+      await query(
+        'UPDATE orders SET payment_status = $1, transaction_code = $2 WHERE id = $3',
+        [strategyResult.paymentStatus, strategyResult.transactionCode, createdOrderId],
         client
       );
 
       for (const item of verifiedItems) {
         await orderRepository.createOrderItem(
           {
-            order_id: orderId,
+            order_id: createdOrderId,
             book_id: item.book_id,
             quantity: item.quantity,
             unit_price: item.unit_price,
@@ -81,16 +100,79 @@ const orderService = {
         }
       }
 
-      return orderId;
+      return { orderId: createdOrderId, paymentResult: strategyResult };
     });
 
-    return this.getOrderDetail(newOrderId);
+    const order = await this.getOrderDetail(orderId);
+    return { order, paymentResult };
+  },
+
+  /**
+   * Lấy thông tin trang thanh toán VietQR cho đơn hàng.
+   */
+  async getVietQrPaymentData(orderId, actorUser) {
+    const order = await this.getOrderDetail(orderId, actorUser);
+    if (!order) {
+      throw new Error('Không tìm thấy đơn hàng.');
+    }
+
+    if (order.payment_method !== 'VIETQR') {
+      throw new Error('Đơn hàng này không sử dụng phương thức thanh toán VietQR.');
+    }
+
+    if (order.status === 'CANCELLED') {
+      throw new Error('Đơn hàng đã bị hủy, không thể thanh toán.');
+    }
+
+    const vietQr = new VietQrStrategy();
+    if (!order.transaction_code) {
+      const generatedCode = vietQr.generateTransactionCode(order.id);
+      await query('UPDATE orders SET transaction_code = $1 WHERE id = $2', [
+        generatedCode,
+        order.id,
+      ]);
+      order.transaction_code = generatedCode;
+    }
+
+    const paymentInfo = vietQr.processPayment(order);
+    return {
+      order,
+      qrUrl: paymentInfo.qrUrl,
+      bankInfo: paymentInfo.bankInfo,
+      transactionCode: paymentInfo.transactionCode,
+    };
+  },
+
+  /**
+   * Webhook xác nhận đã nhận tiền chuyển khoản -> cập nhật payment_status = 'PAID'.
+   */
+  async confirmPaymentWebhook({ orderId, transactionCode }) {
+    let order = null;
+    if (orderId) {
+      order = await orderRepository.findById(Number(orderId));
+    } else if (transactionCode) {
+      const { rows } = await query('SELECT * FROM orders WHERE transaction_code = $1', [
+        String(transactionCode).trim(),
+      ]);
+      order = rows[0] || null;
+    }
+
+    if (!order) {
+      throw new Error('Không tìm thấy đơn hàng tương ứng với mã giao dịch.');
+    }
+
+    if (order.status === 'CANCELLED') {
+      throw new Error('Không thể xác nhận thanh toán cho đơn hàng đã bị hủy.');
+    }
+
+    await query("UPDATE orders SET payment_status = 'PAID' WHERE id = $1", [order.id]);
+    return this.getOrderDetail(order.id);
   },
 
   /**
    * Hủy đơn hàng & hoàn lại tồn kho trong PostgreSQL Transaction:
    * - Khách hàng: chỉ được hủy khi status === 'PENDING' và phải là chủ đơn.
-   * - Admin: được hủy khi status === 'PENDING' hoặc 'SHIPPING'.
+   * - Admin: được hủy khi status là 'PENDING', 'CONFIRMED' hoặc 'SHIPPING'.
    */
   async cancelOrder({ orderId, actorUser }) {
     const cancelledId = await withTransaction(async (client) => {
@@ -105,7 +187,7 @@ const orderService = {
       }
 
       if (isAdmin) {
-        if (order.status !== 'PENDING' && order.status !== 'SHIPPING') {
+        if (!['PENDING', 'CONFIRMED', 'SHIPPING'].includes(order.status)) {
           throw new Error(`Không thể hủy đơn hàng đang ở trạng thái ${order.status}.`);
         }
       } else if (order.status !== 'PENDING') {
@@ -128,8 +210,9 @@ const orderService = {
   },
 
   /**
-   * Admin cập nhật trạng thái đơn hàng.
-   * Nếu chuyển sang CANCELLED -> gọi cancelOrder để đảm bảo hoàn tồn kho.
+   * Admin cập nhật trạng thái đơn hàng:
+   * PENDING -> CONFIRMED -> SHIPPING -> COMPLETED (hoặc CANCELLED hoàn kho).
+   * Nếu đơn COD chuyển sang COMPLETED, tự động cập nhật payment_status = 'PAID'.
    */
   async updateOrderStatus({ orderId, newStatus, adminUser }) {
     const normalized = String(newStatus || '').trim().toUpperCase();
@@ -155,7 +238,8 @@ const orderService = {
     }
 
     const allowedTransitions = {
-      PENDING: ['SHIPPING', 'COMPLETED'],
+      PENDING: ['CONFIRMED', 'SHIPPING', 'COMPLETED'],
+      CONFIRMED: ['SHIPPING', 'COMPLETED'],
       SHIPPING: ['COMPLETED'],
     };
 
@@ -167,6 +251,12 @@ const orderService = {
     }
 
     await orderRepository.updateStatus(order.id, normalized);
+
+    // Nếu đơn COD giao thành công -> tự đánh dấu đã thanh toán
+    if (normalized === 'COMPLETED' && order.payment_method === 'COD') {
+      await query("UPDATE orders SET payment_status = 'PAID' WHERE id = $1", [order.id]);
+    }
+
     return this.getOrderDetail(order.id);
   },
 
@@ -206,7 +296,20 @@ const orderService = {
   },
 
   async getDashboardStats() {
-    return orderRepository.getDashboardStats();
+    const [stats, soldRes] = await Promise.all([
+      orderRepository.getDashboardStats(),
+      query(`
+        SELECT COALESCE(SUM(oi.quantity), 0)::int AS total_sold
+        FROM order_items oi
+        JOIN orders o ON o.id = oi.order_id
+        WHERE o.status != 'CANCELLED'
+      `),
+    ]);
+    if (stats.statusCounts.CONFIRMED === undefined) {
+      stats.statusCounts.CONFIRMED = 0;
+    }
+    stats.totalBooksSold = soldRes.rows[0] ? soldRes.rows[0].total_sold : 0;
+    return stats;
   },
 };
 

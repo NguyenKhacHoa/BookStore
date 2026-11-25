@@ -18,9 +18,15 @@
         <a href="/books" class="px-6 py-3 rounded-xl bg-white text-indigo-700 font-bold text-sm hover:bg-indigo-50 shadow-md transition">
           Khám phá tủ sách &rarr;
         </a>
-        <a href="/cart" class="px-6 py-3 rounded-xl bg-white/10 text-white border border-white/25 font-semibold text-sm hover:bg-white/20 transition">
-          Xem giỏ hàng (<%= cartCount %>)
-        </a>
+        <% if (currentUser && currentUser.role === 'admin') { %>
+          <a href="/admin" class="px-6 py-3 rounded-xl bg-white/10 text-white border border-white/25 font-semibold text-sm hover:bg-white/20 transition">
+            Vào trang quản trị
+          </a>
+        <% } else { %>
+          <a href="/cart" class="px-6 py-3 rounded-xl bg-white/10 text-white border border-white/25 font-semibold text-sm hover:bg-white/20 transition">
+            Xem giỏ hàng (<%= cartCount %>)
+          </a>
+        <% } %>
       </div>
     </div>
   </div>

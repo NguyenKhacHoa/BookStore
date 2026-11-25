@@ -1,6 +1,7 @@
 <%
   const statusStyles = {
     PENDING: { label: 'Chờ xác nhận', cls: 'bg-amber-100 text-amber-800' },
+    CONFIRMED: { label: 'Đã xác nhận', cls: 'bg-indigo-100 text-indigo-800' },
     SHIPPING: { label: 'Đang giao', cls: 'bg-sky-100 text-sky-800' },
     COMPLETED: { label: 'Hoàn thành', cls: 'bg-emerald-100 text-emerald-800' },
     CANCELLED: { label: 'Đã hủy', cls: 'bg-rose-100 text-rose-800' },
@@ -8,6 +9,7 @@
   const tabs = [
     { key: '', label: 'Tất cả' },
     { key: 'PENDING', label: 'Chờ xác nhận' },
+    { key: 'CONFIRMED', label: 'Đã xác nhận' },
     { key: 'SHIPPING', label: 'Đang giao' },
     { key: 'COMPLETED', label: 'Hoàn thành' },
     { key: 'CANCELLED', label: 'Đã hủy' },
@@ -33,38 +35,75 @@
         <tr>
           <th class="px-5 py-3.5">Mã đơn</th>
           <th class="px-5 py-3.5">Khách hàng</th>
-          <th class="px-5 py-3.5">Số SP</th>
           <th class="px-5 py-3.5">Tổng tiền</th>
-          <th class="px-5 py-3.5">Trạng thái</th>
-          <th class="px-5 py-3.5">Ngày đặt</th>
-          <th class="px-5 py-3.5 text-right">Chi tiết</th>
+          <th class="px-5 py-3.5">Thanh toán</th>
+          <th class="px-5 py-3.5">Trạng thái đơn</th>
+          <th class="px-5 py-3.5 text-right">Duyệt nhanh &amp; Chi tiết</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-slate-100">
         <% if (orders.length === 0) { %>
           <tr>
-            <td colspan="7" class="px-5 py-10 text-center text-slate-500">Không có đơn hàng nào.</td>
+            <td colspan="6" class="px-5 py-10 text-center text-slate-500">Không có đơn hàng nào.</td>
           </tr>
         <% } %>
         <% orders.forEach((order) => {
           const badge = statusStyles[order.status] || { label: order.status, cls: 'bg-slate-100 text-slate-700' };
+          const isPaid = order.payment_status === 'PAID';
         %>
           <tr class="hover:bg-slate-50">
-            <td class="px-5 py-3.5 font-extrabold text-slate-900">#<%= order.id %></td>
+            <td class="px-5 py-3.5">
+              <div class="font-extrabold text-slate-900">#<%= order.id %></div>
+              <div class="text-[11px] text-slate-400"><%= new Date(order.created_at).toLocaleString('vi-VN') %></div>
+            </td>
             <td class="px-5 py-3.5">
               <div class="font-semibold text-slate-900"><%= order.user_name %></div>
               <div class="text-xs text-slate-500"><%= order.user_email %></div>
             </td>
-            <td class="px-5 py-3.5 text-slate-600"><%= order.item_count %> loại</td>
-            <td class="px-5 py-3.5 font-bold text-indigo-600"><%= formatCurrency(order.total_amount) %></td>
+            <td class="px-5 py-3.5">
+              <div class="font-bold text-indigo-600"><%= formatCurrency(order.total_amount) %></div>
+              <div class="text-xs text-slate-500"><%= order.item_count %> loại sách</div>
+            </td>
+            <td class="px-5 py-3.5">
+              <span class="px-2.5 py-1 rounded-full text-xs font-bold inline-block <%= isPaid ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-50 text-amber-700 border border-amber-200' %>">
+                <%= isPaid ? 'Đã thanh toán' : 'Chưa thanh toán' %>
+              </span>
+              <div class="text-[11px] text-slate-500 mt-1 font-semibold">
+                <%= order.payment_method %><%= order.transaction_code ? ' • ' + order.transaction_code : '' %>
+              </div>
+            </td>
             <td class="px-5 py-3.5">
               <span class="px-2.5 py-1 rounded-full text-xs font-bold <%= badge.cls %>"><%= badge.label %></span>
             </td>
-            <td class="px-5 py-3.5 text-xs text-slate-500"><%= order.created_at %></td>
             <td class="px-5 py-3.5 text-right">
-              <a href="/admin/orders/<%= order.id %>" class="px-3.5 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-semibold hover:bg-indigo-100 transition">
-                Xem &amp; Xử lý &rarr;
-              </a>
+              <div class="inline-flex items-center gap-2">
+                <% if (order.status === 'PENDING') { %>
+                  <form action="/admin/orders/<%= order.id %>/status" method="POST" class="inline">
+                    <input type="hidden" name="status" value="CONFIRMED" />
+                    <button type="submit" class="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition">
+                      Duyệt đơn
+                    </button>
+                  </form>
+                <% } else if (order.status === 'CONFIRMED') { %>
+                  <form action="/admin/orders/<%= order.id %>/status" method="POST" class="inline">
+                    <input type="hidden" name="status" value="SHIPPING" />
+                    <button type="submit" class="px-3 py-1.5 rounded-lg bg-sky-600 text-white text-xs font-bold hover:bg-sky-700 transition">
+                      Giao hàng
+                    </button>
+                  </form>
+                <% } else if (order.status === 'SHIPPING') { %>
+                  <form action="/admin/orders/<%= order.id %>/status" method="POST" class="inline">
+                    <input type="hidden" name="status" value="COMPLETED" />
+                    <button type="submit" class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition">
+                      Hoàn thành
+                    </button>
+                  </form>
+                <% } %>
+
+                <a href="/admin/orders/<%= order.id %>" class="px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 text-xs font-semibold hover:bg-indigo-100 transition">
+                  Chi tiết &rarr;
+                </a>
+              </div>
             </td>
           </tr>
         <% }) %>

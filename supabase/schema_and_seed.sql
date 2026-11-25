@@ -45,7 +45,9 @@ CREATE TABLE IF NOT EXISTS public.orders (
     shipping_address TEXT NOT NULL,
     phone TEXT NOT NULL,
     payment_method TEXT NOT NULL DEFAULT 'COD',
-    status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'SHIPPING', 'COMPLETED', 'CANCELLED')),
+    payment_status TEXT NOT NULL DEFAULT 'UNPAID' CHECK (payment_status IN ('UNPAID', 'PAID')),
+    transaction_code TEXT UNIQUE,
+    status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'CONFIRMED', 'SHIPPING', 'COMPLETED', 'CANCELLED')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

@@ -1,7 +1,7 @@
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
   <div class="mb-6">
     <h1 class="text-3xl font-extrabold text-slate-900">Xác nhận đặt hàng</h1>
-    <p class="text-sm text-slate-500 mt-1">Điền thông tin giao hàng để hoàn tất đơn hàng của bạn</p>
+    <p class="text-sm text-slate-500 mt-1">Điền thông tin giao hàng và chọn phương thức thanh toán phù hợp</p>
   </div>
 
   <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -45,14 +45,32 @@
       </div>
 
       <div>
-        <label class="block text-sm font-semibold text-slate-700 mb-2">Phương thức thanh toán</label>
-        <label class="flex items-center gap-3 p-4 rounded-xl border-2 border-indigo-500 bg-indigo-50/60 cursor-pointer">
-          <input type="radio" name="payment_method" value="COD" checked class="w-4 h-4 text-indigo-600" />
-          <div>
-            <div class="text-sm font-bold text-slate-900">Thanh toán khi nhận hàng (COD)</div>
-            <div class="text-xs text-slate-500">Kiểm tra sách trước khi thanh toán tiền mặt cho nhân viên giao hàng</div>
-          </div>
-        </label>
+        <label class="block text-sm font-semibold text-slate-700 mb-2.5">Phương thức thanh toán</label>
+        <div class="space-y-3">
+          <!-- COD -->
+          <label class="payment-option flex items-start gap-3 p-4 rounded-xl border-2 border-indigo-500 bg-indigo-50/50 cursor-pointer transition">
+            <input type="radio" name="payment_method" value="COD" checked class="mt-1 w-4 h-4 text-indigo-600" onchange="highlightPayment(this)" />
+            <div class="flex-1">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-sm font-bold text-slate-900">Thanh toán khi nhận hàng (COD)</span>
+                <span class="px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 text-[11px] font-semibold">Tiền mặt</span>
+              </div>
+              <div class="text-xs text-slate-500 mt-0.5">Kiểm tra sách trước khi thanh toán tiền mặt cho nhân viên giao hàng.</div>
+            </div>
+          </label>
+
+          <!-- VIETQR -->
+          <label class="payment-option flex items-start gap-3 p-4 rounded-xl border-2 border-slate-200 bg-white hover:border-indigo-300 cursor-pointer transition">
+            <input type="radio" name="payment_method" value="VIETQR" class="mt-1 w-4 h-4 text-indigo-600" onchange="highlightPayment(this)" />
+            <div class="flex-1">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-sm font-bold text-slate-900">Chuyển khoản QR (VietQR)</span>
+                <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[11px] font-bold">Xác nhận tức thì</span>
+              </div>
+              <div class="text-xs text-slate-500 mt-0.5">Quét mã VietQR động bằng ứng dụng ngân hàng (MB Bank / Napas 247), tự động điền số tiền &amp; nội dung.</div>
+            </div>
+          </label>
+        </div>
       </div>
 
       <div class="pt-3 flex flex-wrap items-center gap-3">
@@ -104,3 +122,17 @@
     </div>
   </div>
 </div>
+
+<script>
+  function highlightPayment(radio) {
+    document.querySelectorAll('.payment-option').forEach((el) => {
+      el.classList.remove('border-indigo-500', 'bg-indigo-50/50');
+      el.classList.add('border-slate-200', 'bg-white');
+    });
+    const active = radio.closest('.payment-option');
+    if (active) {
+      active.classList.remove('border-slate-200', 'bg-white');
+      active.classList.add('border-indigo-500', 'bg-indigo-50/50');
+    }
+  }
+</script>

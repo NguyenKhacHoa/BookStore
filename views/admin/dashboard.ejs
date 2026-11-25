@@ -1,65 +1,99 @@
 <%
   const statusStyles = {
     PENDING: { label: 'Chờ xác nhận', cls: 'bg-amber-100 text-amber-800' },
+    CONFIRMED: { label: 'Đã xác nhận', cls: 'bg-indigo-100 text-indigo-800' },
     SHIPPING: { label: 'Đang giao', cls: 'bg-sky-100 text-sky-800' },
     COMPLETED: { label: 'Hoàn thành', cls: 'bg-emerald-100 text-emerald-800' },
     CANCELLED: { label: 'Đã hủy', cls: 'bg-rose-100 text-rose-800' },
   };
 %>
 
-<!-- KPI Cards -->
-<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-6">
+<!-- Quick Management Actions -->
+<div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+  <div>
+    <h2 class="text-xl font-extrabold text-slate-900">Thống kê bán hàng &amp; Kho sách</h2>
+    <p class="text-xs text-slate-500 mt-0.5">Theo dõi doanh thu, số sách đã bán và quản lý tồn kho</p>
+  </div>
+  <div class="flex flex-wrap items-center gap-2.5">
+    <a href="/admin/books/create" class="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 shadow-sm transition">
+      + Thêm sách mới
+    </a>
+    <a href="/admin/categories" class="px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 transition">
+      Quản lý danh mục
+    </a>
+  </div>
+</div>
+
+<!-- 4 Core Sales & Inventory KPI Cards -->
+<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
   <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
     <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Doanh thu (Hoàn thành)</div>
     <div class="text-2xl font-extrabold text-indigo-600 mt-2"><%= formatCurrency(stats.totalRevenue) %></div>
-    <div class="text-xs text-emerald-600 mt-1 font-medium"><%= stats.statusCounts.COMPLETED %> đơn đã hoàn thành</div>
+    <div class="text-xs text-emerald-600 mt-1 font-medium"><%= stats.statusCounts.COMPLETED %> đơn hoàn thành</div>
   </div>
 
   <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-    <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Tổng đơn hàng</div>
-    <div class="text-2xl font-extrabold text-slate-900 mt-2"><%= stats.totalOrders %></div>
-    <div class="text-xs text-amber-600 mt-1 font-medium"><%= stats.statusCounts.PENDING %> đơn chờ xác nhận</div>
+    <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Số lượng sách đã bán</div>
+    <div class="text-2xl font-extrabold text-slate-900 mt-2"><%= stats.totalBooksSold || 0 %> <span class="text-sm font-semibold text-slate-500">cuốn</span></div>
+    <div class="text-xs text-slate-500 mt-1">Từ <%= stats.totalOrders - stats.statusCounts.CANCELLED %> đơn hợp lệ</div>
   </div>
 
   <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
     <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Sách đang kinh doanh</div>
-    <div class="text-2xl font-extrabold text-slate-900 mt-2"><%= stats.totalActiveBooks %></div>
-    <div class="text-xs text-slate-500 mt-1"><a href="/admin/books" class="text-indigo-600 hover:underline">Quản lý kho sách &rarr;</a></div>
+    <div class="text-2xl font-extrabold text-slate-900 mt-2"><%= stats.totalActiveBooks %> <span class="text-sm font-semibold text-slate-500">đầu sách</span></div>
+    <div class="text-xs mt-1"><a href="/admin/books" class="text-indigo-600 font-semibold hover:underline">Quản lý kho sách &rarr;</a></div>
   </div>
 
   <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-    <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Khách hàng</div>
-    <div class="text-2xl font-extrabold text-slate-900 mt-2"><%= stats.totalUsers %></div>
-    <div class="text-xs text-slate-500 mt-1">Tài khoản người dùng đã đăng ký</div>
+    <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Cảnh báo tồn kho (&le; 10)</div>
+    <div class="text-2xl font-extrabold <%= lowStockBooks.length > 0 ? 'text-rose-600' : 'text-emerald-600' %> mt-2">
+      <%= lowStockBooks.length %> <span class="text-sm font-semibold text-slate-500">đầu sách</span>
+    </div>
+    <div class="text-xs mt-1"><a href="/admin/books?sort=stock_asc" class="text-amber-600 font-semibold hover:underline">Kiểm tra tồn kho &rarr;</a></div>
   </div>
 </div>
 
-<!-- Order Status Summary -->
-<div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-  <a href="/admin/orders?status=PENDING" class="bg-amber-50 border border-amber-200 rounded-xl p-4 hover:shadow-sm transition">
-    <div class="text-xs font-bold text-amber-700">CHỜ XÁC NHẬN</div>
-    <div class="text-2xl font-extrabold text-amber-900 mt-1"><%= stats.statusCounts.PENDING %></div>
-  </a>
-  <a href="/admin/orders?status=SHIPPING" class="bg-sky-50 border border-sky-200 rounded-xl p-4 hover:shadow-sm transition">
-    <div class="text-xs font-bold text-sky-700">ĐANG GIAO</div>
-    <div class="text-2xl font-extrabold text-sky-900 mt-1"><%= stats.statusCounts.SHIPPING %></div>
-  </a>
-  <a href="/admin/orders?status=COMPLETED" class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 hover:shadow-sm transition">
-    <div class="text-xs font-bold text-emerald-700">HOÀN THÀNH</div>
-    <div class="text-2xl font-extrabold text-emerald-900 mt-1"><%= stats.statusCounts.COMPLETED %></div>
-  </a>
-  <a href="/admin/orders?status=CANCELLED" class="bg-rose-50 border border-rose-200 rounded-xl p-4 hover:shadow-sm transition">
-    <div class="text-xs font-bold text-rose-700">ĐÃ HỦY</div>
-    <div class="text-2xl font-extrabold text-rose-900 mt-1"><%= stats.statusCounts.CANCELLED %></div>
-  </a>
-</div>
-
 <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-  <!-- Recent Orders -->
+  <!-- Low Stock Alert (Ưu tiên hiển thị nổi bật) -->
+  <div class="lg:col-span-5 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+      <h3 class="font-bold text-slate-900">Cảnh báo sách sắp hết hàng</h3>
+      <a href="/admin/books?sort=stock_asc" class="text-xs font-semibold text-indigo-600 hover:underline">Cập nhật kho &rarr;</a>
+    </div>
+    <% if (!lowStockBooks || lowStockBooks.length === 0) { %>
+      <div class="p-8 text-center text-sm text-emerald-600 font-medium">
+        Tất cả đầu sách hiện đều có tồn kho an toàn (&gt; 10 cuốn)!
+      </div>
+    <% } else { %>
+      <div class="divide-y divide-slate-100">
+        <% lowStockBooks.forEach((book) => { %>
+          <div class="px-5 py-3.5 flex items-center justify-between gap-3 hover:bg-slate-50">
+            <div class="flex items-center gap-3 min-w-0">
+              <img src="<%= book.cover_image %>" alt="<%= book.title %>" class="w-10 h-14 rounded-lg object-cover border border-slate-200 shrink-0" />
+              <div class="min-w-0">
+                <a href="/admin/books/<%= book.id %>/edit" class="font-semibold text-sm text-slate-900 hover:text-indigo-600 truncate block">
+                  <%= book.title %>
+                </a>
+                <div class="text-xs text-slate-500"><%= book.category_name %></div>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <span class="px-2.5 py-1 rounded-full text-xs font-bold <%= book.stock === 0 ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-800' %>">
+                Còn <%= book.stock %>
+              </span>
+              <a href="/admin/books/<%= book.id %>/edit" class="text-xs font-semibold text-indigo-600 hover:underline">Nhập</a>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    <% } %>
+  </div>
+
+  <!-- Recent Orders (Gọn gàng, đồng bộ với User) -->
   <div class="lg:col-span-7 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
     <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-      <h2 class="font-bold text-slate-900">Đơn hàng gần đây</h2>
-      <a href="/admin/orders" class="text-xs font-semibold text-indigo-600 hover:underline">Xem tất cả &rarr;</a>
+      <h3 class="font-bold text-slate-900">Đơn hàng mới nhất (<%= stats.statusCounts.PENDING %> chờ duyệt)</h3>
+      <a href="/admin/orders" class="text-xs font-semibold text-indigo-600 hover:underline">Quản lý đơn hàng &rarr;</a>
     </div>
     <% if (!stats.recentOrders || stats.recentOrders.length === 0) { %>
       <div class="p-8 text-center text-sm text-slate-500">Chưa có đơn hàng nào.</div>
@@ -84,7 +118,7 @@
                 </td>
                 <td class="px-5 py-3.5">
                   <div class="font-semibold text-slate-800"><%= order.user_name %></div>
-                  <div class="text-xs text-slate-400"><%= order.created_at %></div>
+                  <div class="text-xs text-slate-400"><%= new Date(order.created_at).toLocaleString('vi-VN') %></div>
                 </td>
                 <td class="px-5 py-3.5 font-bold text-slate-900"><%= formatCurrency(order.total_amount) %></td>
                 <td class="px-5 py-3.5">
@@ -94,38 +128,6 @@
             <% }) %>
           </tbody>
         </table>
-      </div>
-    <% } %>
-  </div>
-
-  <!-- Low Stock Alert -->
-  <div class="lg:col-span-5 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-    <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-      <h2 class="font-bold text-slate-900">Cảnh báo sắp hết hàng (&le; 10)</h2>
-      <a href="/admin/books?sort=stock_asc" class="text-xs font-semibold text-indigo-600 hover:underline">Xem kho &rarr;</a>
-    </div>
-    <% if (!lowStockBooks || lowStockBooks.length === 0) { %>
-      <div class="p-8 text-center text-sm text-emerald-600 font-medium">
-        Tất cả đầu sách hiện đều có tồn kho an toàn!
-      </div>
-    <% } else { %>
-      <div class="divide-y divide-slate-100">
-        <% lowStockBooks.forEach((book) => { %>
-          <div class="px-5 py-3.5 flex items-center justify-between gap-3 hover:bg-slate-50">
-            <div class="flex items-center gap-3 min-w-0">
-              <img src="<%= book.cover_image %>" alt="<%= book.title %>" class="w-10 h-14 rounded-lg object-cover border border-slate-200 shrink-0" />
-              <div class="min-w-0">
-                <a href="/admin/books/<%= book.id %>/edit" class="font-semibold text-sm text-slate-900 hover:text-indigo-600 truncate block">
-                  <%= book.title %>
-                </a>
-                <div class="text-xs text-slate-500"><%= book.category_name %></div>
-              </div>
-            </div>
-            <span class="px-2.5 py-1 rounded-full text-xs font-bold shrink-0 <%= book.stock === 0 ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-800' %>">
-              Còn <%= book.stock %>
-            </span>
-          </div>
-        <% }) %>
       </div>
     <% } %>
   </div>
