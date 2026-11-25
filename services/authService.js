@@ -1,7 +1,7 @@
 const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
 const { query } = require('../config/database');
-const userRepository = require('../repositories/userRepository');
+const userModel = require('../models/userModel');
 
 const OTP_TTL_MS = 5 * 60 * 1000; // 5 phút
 
@@ -67,14 +67,14 @@ const authService = {
       throw new Error('Mật khẩu phải có ít nhất 6 ký tự.');
     }
 
-    const existing = await userRepository.findByEmail(cleanEmail);
+    const existing = await userModel.findByEmail(cleanEmail);
     if (existing) {
       throw new Error('Email này đã được đăng ký. Vui lòng sử dụng email khác.');
     }
 
     const password_hash = await bcrypt.hash(password, 10);
 
-    return userRepository.create({
+    return userModel.create({
       email: cleanEmail,
       password_hash,
       full_name: cleanName,
@@ -90,7 +90,7 @@ const authService = {
       throw new Error('Vui lòng nhập email và mật khẩu.');
     }
 
-    const user = await userRepository.findByEmail(cleanEmail);
+    const user = await userModel.findByEmail(cleanEmail);
     if (!user) {
       throw new Error('Email hoặc mật khẩu không chính xác.');
     }
@@ -120,7 +120,7 @@ const authService = {
       throw new Error('Vui lòng nhập địa chỉ email của bạn.');
     }
 
-    const user = await userRepository.findByEmail(cleanEmail);
+    const user = await userModel.findByEmail(cleanEmail);
     if (!user) {
       throw new Error('Email này chưa được đăng ký trong hệ thống.');
     }
@@ -174,7 +174,7 @@ const authService = {
   },
 
   async getUserById(id) {
-    return userRepository.findById(id);
+    return userModel.findById(id);
   },
 };
 

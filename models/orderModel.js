@@ -1,6 +1,6 @@
 const { query } = require('../config/database');
 
-const orderRepository = {
+const orderModel = {
   async createOrder(
     {
       user_id,
@@ -132,4 +132,4 @@ const orderRepository = {
   },
 };
 
-module.exports = orderRepository;
+module.exports = orderModel;

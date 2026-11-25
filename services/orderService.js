@@ -1,6 +1,6 @@
 const { query, withTransaction } = require('../config/database');
-const bookRepository = require('../repositories/bookRepository');
-const orderRepository = require('../repositories/orderRepository');
+const bookModel = require('../models/bookModel');
+const orderModel = require('../models/orderModel');
 const PaymentContext = require('./payment/PaymentContext');
 const VietQrStrategy = require('./payment/VietQrStrategy');
 
@@ -47,7 +47,7 @@ const orderService = {
           throw new Error('Số lượng sản phẩm trong giỏ hàng không hợp lệ.');
         }
 
-        const book = await bookRepository.findByIdForUpdate(Number(item.bookId), client);
+        const book = await bookModel.findByIdForUpdate(Number(item.bookId), client);
         if (!book || !book.is_active) {
           throw new Error(`Sách "${item.title || item.bookId}" hiện không còn kinh doanh.`);
         }
@@ -66,7 +66,7 @@ const orderService = {
         });
       }
 
-      const createdOrderId = await orderRepository.createOrder(
+      const createdOrderId = await orderModel.createOrder(
         {
           user_id: Number(userId),
           total_amount: totalAmount,
@@ -93,7 +93,7 @@ const orderService = {
       );
 
       for (const item of verifiedItems) {
-        await orderRepository.createOrderItem(
+        await orderModel.createOrderItem(
           {
             order_id: createdOrderId,
             book_id: item.book_id,
@@ -103,7 +103,7 @@ const orderService = {
           client
         );
 
-        const result = await bookRepository.decrementStock(item.book_id, item.quantity, client);
+        const result = await bookModel.decrementStock(item.book_id, item.quantity, client);
         if (result.changes === 0) {
           throw new Error('Không thể trừ tồn kho do dữ liệu thay đổi đồng thời. Vui lòng thử lại.');
         }
@@ -158,7 +158,7 @@ const orderService = {
   async confirmPaymentWebhook({ orderId, transactionCode }) {
     let order = null;
     if (orderId) {
-      order = await orderRepository.findById(Number(orderId));
+      order = await orderModel.findById(Number(orderId));
     } else if (transactionCode) {
       const { rows } = await query('SELECT * FROM orders WHERE transaction_code = $1', [
         String(transactionCode).trim(),
@@ -186,7 +186,7 @@ const orderService = {
    */
   async confirmOrderReceived({ orderId, actorUser }) {
     const completedId = await withTransaction(async (client) => {
-      const order = await orderRepository.findById(Number(orderId), client);
+      const order = await orderModel.findById(Number(orderId), client);
       if (!order) {
         throw new Error('Không tìm thấy đơn hàng.');
       }
@@ -199,7 +199,7 @@ const orderService = {
         throw new Error('Chỉ có thể xác nhận đã nhận hàng khi đơn đang ở trạng thái Đang giao hàng (SHIPPING).');
       }
 
-      await orderRepository.updateStatus(order.id, 'COMPLETED', client);
+      await orderModel.updateStatus(order.id, 'COMPLETED', client);
 
       if (order.payment_method === 'COD') {
         await query("UPDATE orders SET payment_status = 'PAID' WHERE id = $1", [order.id], client);
@@ -220,7 +220,7 @@ const orderService = {
       throw new Error('Vui lòng nhập lý do yêu cầu hoàn hàng.');
     }
 
-    const order = await orderRepository.findById(Number(orderId));
+    const order = await orderModel.findById(Number(orderId));
     if (!order) {
       throw new Error('Không tìm thấy đơn hàng.');
     }
@@ -249,7 +249,7 @@ const orderService = {
    */
   async approveReturn({ orderId }) {
     const returnedId = await withTransaction(async (client) => {
-      const order = await orderRepository.findById(Number(orderId), client);
+      const order = await orderModel.findById(Number(orderId), client);
       if (!order) {
         throw new Error('Không tìm thấy đơn hàng.');
       }
@@ -264,9 +264,9 @@ const orderService = {
         client
       );
 
-      const items = await orderRepository.findItemsByOrderId(order.id, client);
+      const items = await orderModel.findItemsByOrderId(order.id, client);
       for (const item of items) {
-        await bookRepository.incrementStock(item.book_id, item.quantity, client);
+        await bookModel.incrementStock(item.book_id, item.quantity, client);
       }
 
       return order.id;
@@ -279,7 +279,7 @@ const orderService = {
    * Admin từ chối hoàn hàng -> chuyển status sang 'RETURN_REJECTED'.
    */
   async rejectReturn({ orderId }) {
-    const order = await orderRepository.findById(Number(orderId));
+    const order = await orderModel.findById(Number(orderId));
     if (!order) {
       throw new Error('Không tìm thấy đơn hàng.');
     }
@@ -288,7 +288,7 @@ const orderService = {
       throw new Error('Chỉ có thể từ chối hoàn hàng cho đơn đang ở trạng thái Yêu cầu hoàn hàng.');
     }
 
-    await orderRepository.updateStatus(order.id, 'RETURN_REJECTED');
+    await orderModel.updateStatus(order.id, 'RETURN_REJECTED');
     return this.getOrderDetail(order.id);
   },
 
@@ -300,7 +300,7 @@ const orderService = {
    */
   async cancelOrder({ orderId, actorUser }) {
     const cancelledId = await withTransaction(async (client) => {
-      const order = await orderRepository.findById(Number(orderId), client);
+      const order = await orderModel.findById(Number(orderId), client);
       if (!order) {
         throw new Error('Không tìm thấy đơn hàng.');
       }
@@ -318,15 +318,15 @@ const orderService = {
         throw new Error('Đơn hàng đã được xác nhận, không thể hủy');
       }
 
-      await orderRepository.updateStatus(order.id, 'CANCELLED', client);
+      await orderModel.updateStatus(order.id, 'CANCELLED', client);
 
       if (order.payment_status === 'PAID') {
         await query("UPDATE orders SET payment_status = 'REFUNDED' WHERE id = $1", [order.id], client);
       }
 
-      const items = await orderRepository.findItemsByOrderId(order.id, client);
+      const items = await orderModel.findItemsByOrderId(order.id, client);
       for (const item of items) {
-        await bookRepository.incrementStock(item.book_id, item.quantity, client);
+        await bookModel.incrementStock(item.book_id, item.quantity, client);
       }
 
       return order.id;
@@ -346,7 +346,7 @@ const orderService = {
       throw new Error('Trạng thái đơn hàng không hợp lệ.');
     }
 
-    const order = await orderRepository.findById(Number(orderId));
+    const order = await orderModel.findById(Number(orderId));
     if (!order) {
       throw new Error('Không tìm thấy đơn hàng.');
     }
@@ -376,7 +376,7 @@ const orderService = {
       throw new Error(`Không thể chuyển trạng thái từ ${order.status} sang ${normalized}.`);
     }
 
-    await orderRepository.updateStatus(order.id, normalized);
+    await orderModel.updateStatus(order.id, normalized);
 
     // Nếu đơn COD giao thành công -> tự đánh dấu đã thanh toán
     if (normalized === 'COMPLETED' && order.payment_method === 'COD') {
@@ -387,17 +387,17 @@ const orderService = {
   },
 
   async getUserOrders(userId) {
-    const orders = await orderRepository.findByUserId(Number(userId));
+    const orders = await orderModel.findByUserId(Number(userId));
     return Promise.all(
       orders.map(async (order) => ({
         ...order,
-        items: await orderRepository.findItemsByOrderId(order.id),
+        items: await orderModel.findItemsByOrderId(order.id),
       }))
     );
   },
 
   async getOrderDetail(orderId, actorUser = null) {
-    const order = await orderRepository.findById(Number(orderId));
+    const order = await orderModel.findById(Number(orderId));
     if (!order) {
       return null;
     }
@@ -410,7 +410,7 @@ const orderService = {
       throw new Error('Bạn không có quyền xem đơn hàng này.');
     }
 
-    const items = await orderRepository.findItemsByOrderId(order.id);
+    const items = await orderModel.findItemsByOrderId(order.id);
     return {
       ...order,
       items,
@@ -418,12 +418,12 @@ const orderService = {
   },
 
   async getAdminOrders({ status = '' } = {}) {
-    return orderRepository.findAll({ status });
+    return orderModel.findAll({ status });
   },
 
   async getDashboardStats() {
     const [stats, revenueRes, soldRes] = await Promise.all([
-      orderRepository.getDashboardStats(),
+      orderModel.getDashboardStats(),
       query(`
         SELECT COALESCE(SUM(total_amount), 0)::int AS revenue
         FROM orders

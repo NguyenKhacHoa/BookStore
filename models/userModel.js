@@ -1,6 +1,6 @@
 const { query } = require('../config/database');
 
-const userRepository = {
+const userModel = {
   async findByEmail(email) {
     const { rows } = await query('SELECT * FROM users WHERE email = $1', [email]);
     return rows[0] || null;
@@ -39,4 +39,4 @@ const userRepository = {
   },
 };
 
-module.exports = userRepository;
+module.exports = userModel;

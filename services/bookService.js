@@ -1,5 +1,5 @@
-const bookRepository = require('../repositories/bookRepository');
-const categoryRepository = require('../repositories/categoryRepository');
+const bookModel = require('../models/bookModel');
+const categoryModel = require('../models/categoryModel');
 
 function toSlug(text) {
   return String(text || '')
@@ -18,8 +18,8 @@ const bookService = {
   // ===== BOOKS =====
   async getHomeData() {
     const [featuredBooks, categories] = await Promise.all([
-      bookRepository.findFeatured(8),
-      categoryRepository.findAllWithBookCount(),
+      bookModel.findFeatured(8),
+      categoryModel.findAllWithBookCount(),
     ]);
     return { featuredBooks, categories };
   },
@@ -38,13 +38,13 @@ const bookService = {
     const offset = (safePage - 1) * safeLimit;
 
     const [total, books] = await Promise.all([
-      bookRepository.countAll({
+      bookModel.countAll({
         search,
         categoryId,
         categorySlug,
         includeInactive,
       }),
-      bookRepository.findAll({
+      bookModel.findAll({
         search,
         categoryId,
         categorySlug,
@@ -69,16 +69,16 @@ const bookService = {
   },
 
   async getBookById(id) {
-    return bookRepository.findById(Number(id));
+    return bookModel.findById(Number(id));
   },
 
   async getBookDetail(id) {
-    const book = await bookRepository.findById(Number(id));
+    const book = await bookModel.findById(Number(id));
     if (!book || !book.is_active) {
       return null;
     }
     const relatedBooks = book.category_id
-      ? await bookRepository.findRelated(book.category_id, book.id, 4)
+      ? await bookModel.findRelated(book.category_id, book.id, 4)
       : [];
     return { book, relatedBooks };
   },
@@ -92,7 +92,7 @@ const bookService = {
       throw new Error('Số lượng phải là số nguyên dương.');
     }
 
-    const book = await bookRepository.findById(Number(bookId));
+    const book = await bookModel.findById(Number(bookId));
     if (!book || !book.is_active) {
       throw new Error('Cuốn sách này hiện không tồn tại hoặc đã ngừng kinh doanh.');
     }
@@ -114,7 +114,7 @@ const bookService = {
     if (!title || !author) {
       throw new Error('Tên sách và tác giả không được để trống.');
     }
-    if (!category_id || !(await categoryRepository.findById(category_id))) {
+    if (!category_id || !(await categoryModel.findById(category_id))) {
       throw new Error('Danh mục sách không hợp lệ.');
     }
     if (!Number.isFinite(price) || price < 0) {
@@ -124,7 +124,7 @@ const bookService = {
       throw new Error('Số lượng tồn kho phải là số nguyên không âm.');
     }
 
-    return bookRepository.create({
+    return bookModel.create({
       category_id,
       title,
       author,
@@ -137,7 +137,7 @@ const bookService = {
   },
 
   async updateBook(id, payload) {
-    const existing = await bookRepository.findById(Number(id));
+    const existing = await bookModel.findById(Number(id));
     if (!existing) {
       throw new Error('Không tìm thấy sách cần cập nhật.');
     }
@@ -151,7 +151,7 @@ const bookService = {
     if (!title || !author) {
       throw new Error('Tên sách và tác giả không được để trống.');
     }
-    if (!category_id || !(await categoryRepository.findById(category_id))) {
+    if (!category_id || !(await categoryModel.findById(category_id))) {
       throw new Error('Danh mục sách không hợp lệ.');
     }
     if (!Number.isFinite(price) || price < 0) {
@@ -161,7 +161,7 @@ const bookService = {
       throw new Error('Số lượng tồn kho phải là số nguyên không âm.');
     }
 
-    return bookRepository.update(existing.id, {
+    return bookModel.update(existing.id, {
       category_id,
       title,
       author,
@@ -177,13 +177,13 @@ const bookService = {
    * Không xóa cứng sách đã từng có trong order_items; chỉ cập nhật is_active = 0.
    */
   async deleteOrHideBook(id) {
-    const existing = await bookRepository.findById(Number(id));
+    const existing = await bookModel.findById(Number(id));
     if (!existing) {
       throw new Error('Không tìm thấy sách.');
     }
 
-    if (await bookRepository.hasOrderItems(existing.id)) {
-      await bookRepository.setActive(existing.id, 0);
+    if (await bookModel.hasOrderItems(existing.id)) {
+      await bookModel.setActive(existing.id, 0);
       return {
         action: 'soft_deleted',
         message:
@@ -191,7 +191,7 @@ const bookService = {
       };
     }
 
-    await bookRepository.deleteHard(existing.id);
+    await bookModel.deleteHard(existing.id);
     return {
       action: 'hard_deleted',
       message: 'Đã xóa sách khỏi hệ thống thành công.',
@@ -199,26 +199,26 @@ const bookService = {
   },
 
   async toggleBookActive(id) {
-    const existing = await bookRepository.findById(Number(id));
+    const existing = await bookModel.findById(Number(id));
     if (!existing) {
       throw new Error('Không tìm thấy sách.');
     }
     const nextState = existing.is_active ? 0 : 1;
-    await bookRepository.setActive(existing.id, nextState);
+    await bookModel.setActive(existing.id, nextState);
     return nextState;
   },
 
   async getLowStockBooks(threshold = 10, limit = 5) {
-    return bookRepository.findLowStock(threshold, limit);
+    return bookModel.findLowStock(threshold, limit);
   },
 
   // ===== CATEGORIES =====
   async getAllCategories() {
-    return categoryRepository.findAll();
+    return categoryModel.findAll();
   },
 
   async getCategoriesWithBookCount() {
-    return categoryRepository.findAllWithBookCount();
+    return categoryModel.findAllWithBookCount();
   },
 
   async createCategory({ name, slug }) {
@@ -231,18 +231,18 @@ const bookService = {
       throw new Error('Slug danh mục không hợp lệ.');
     }
 
-    if (await categoryRepository.findByName(cleanName)) {
+    if (await categoryModel.findByName(cleanName)) {
       throw new Error('Tên danh mục đã tồn tại.');
     }
-    if (await categoryRepository.findBySlug(cleanSlug)) {
+    if (await categoryModel.findBySlug(cleanSlug)) {
       throw new Error('Slug danh mục đã tồn tại.');
     }
 
-    return categoryRepository.create({ name: cleanName, slug: cleanSlug });
+    return categoryModel.create({ name: cleanName, slug: cleanSlug });
   },
 
   async updateCategory(id, { name, slug }) {
-    const existing = await categoryRepository.findById(Number(id));
+    const existing = await categoryModel.findById(Number(id));
     if (!existing) {
       throw new Error('Không tìm thấy danh mục.');
     }
@@ -253,31 +253,31 @@ const bookService = {
     }
     const cleanSlug = toSlug(slug || cleanName);
 
-    const byName = await categoryRepository.findByName(cleanName);
+    const byName = await categoryModel.findByName(cleanName);
     if (byName && Number(byName.id) !== Number(existing.id)) {
       throw new Error('Tên danh mục đã tồn tại.');
     }
 
-    const bySlug = await categoryRepository.findBySlug(cleanSlug);
+    const bySlug = await categoryModel.findBySlug(cleanSlug);
     if (bySlug && Number(bySlug.id) !== Number(existing.id)) {
       throw new Error('Slug danh mục đã tồn tại.');
     }
 
-    return categoryRepository.update(existing.id, { name: cleanName, slug: cleanSlug });
+    return categoryModel.update(existing.id, { name: cleanName, slug: cleanSlug });
   },
 
   async deleteCategory(id) {
-    const existing = await categoryRepository.findById(Number(id));
+    const existing = await categoryModel.findById(Number(id));
     if (!existing) {
       throw new Error('Không tìm thấy danh mục.');
     }
 
-    const bookCount = await categoryRepository.countBooksInCategory(existing.id);
+    const bookCount = await categoryModel.countBooksInCategory(existing.id);
     if (bookCount > 0) {
       throw new Error(`Không thể xóa danh mục đang chứa ${bookCount} cuốn sách.`);
     }
 
-    await categoryRepository.delete(existing.id);
+    await categoryModel.delete(existing.id);
   },
 };
 

@@ -1,6 +1,6 @@
 # Bookstore MVC - Hệ Thống Quản Lý & Bán Sách Trực Tuyến
 
-Dự án xây dựng website bán sách cơ bản phục vụ môn học **Software Architecture & Design**, áp dụng kiến trúc phân tầng **MVC kết hợp Repository, Service & Strategy Pattern** trên nền **Supabase (PostgreSQL)**.
+Dự án xây dựng website bán sách cơ bản phục vụ môn học **Software Architecture & Design**, áp dụng kiến trúc phân tầng **MVC (Model – View – Controller) kết hợp Service & Strategy Pattern** trên nền **Supabase (PostgreSQL)**.
 
 ## 1. Công nghệ & Design Patterns
 - **Runtime & Framework:** Node.js, Express.js

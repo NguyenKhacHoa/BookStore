@@ -1,6 +1,6 @@
 const { query } = require('../config/database');
 
-const bookRepository = {
+const bookModel = {
   async findAll({
     search = '',
     categoryId = null,
@@ -242,4 +242,4 @@ const bookRepository = {
   },
 };
 
-module.exports = bookRepository;
+module.exports = bookModel;

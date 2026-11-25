@@ -5,10 +5,10 @@
 - [x] Thiết lập cấu trúc thư mục chuẩn theo `docs/ARCHITECTURE.md`.
 - [x] Thiết lập kết nối Supabase PostgreSQL (`config/database.js`) và viết script SQL khởi tạo 5 bảng + seed data (`supabase/schema_and_seed.sql`).
 
-## Giai đoạn 2: Tầng Repository, Service & Payment Strategy
-- [x] Xây dựng `userRepository.js` & `authService.js` (Đăng ký, đăng nhập, mã hóa mật khẩu).
-- [x] Xây dựng `categoryRepository.js`, `bookRepository.js` & `bookService.js` (Tìm kiếm, lọc, CRUD sách).
-- [x] Xây dựng `orderRepository.js` & `orderService.js` (Transaction đặt hàng, trừ kho, hủy đơn hoàn kho, thống kê).
+## Giai đoạn 2: Tầng Model, Service & Payment Strategy
+- [x] Xây dựng `userModel.js` & `authService.js` (Đăng ký, đăng nhập, quên mật khẩu OTP, mã hóa mật khẩu).
+- [x] Xây dựng `categoryModel.js`, `bookModel.js` & `bookService.js` (Tìm kiếm, lọc, CRUD sách).
+- [x] Xây dựng `orderModel.js` & `orderService.js` (Transaction đặt hàng, trừ kho, hủy đơn hoàn tiền/hoàn kho, hoàn hàng, thống kê).
 - [x] Áp dụng **Strategy Pattern** (`services/payment/PaymentContext.js`, `CodStrategy.js`, `VietQrStrategy.js`) cho thanh toán COD & VietQR.
 
 ## Giai đoạn 3: Giao diện UI/UX & Theo dõi đơn hàng

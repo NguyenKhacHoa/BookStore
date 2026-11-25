@@ -1,6 +1,6 @@
 const { query } = require('../config/database');
 
-const categoryRepository = {
+const categoryModel = {
   async findAll() {
     const { rows } = await query('SELECT * FROM categories ORDER BY id ASC');
     return rows;
@@ -61,4 +61,4 @@ const categoryRepository = {
   },
 };
 
-module.exports = categoryRepository;
+module.exports = categoryModel;
